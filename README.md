@@ -1,3 +1,3 @@
 # HiveKit
 
-Toolkits for using and developing hive agents, including CLI and SDK.
+Toolkits for using hive agents, including CLI and SDK.
