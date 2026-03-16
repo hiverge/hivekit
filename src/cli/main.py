@@ -3,6 +3,7 @@ import os
 import subprocess
 from importlib.metadata import PackageNotFoundError, version
 
+import argcomplete
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -458,62 +459,7 @@ def main():
     )
     parser_show_exp.set_defaults(func=list_experiments)
 
-    # ## show sandboxes
-    # parser_show_sandbox = show_subparsers.add_parser(
-    #     "sandboxes", aliases=["sand", "sands"], help="Show sandboxes"
-    # )
-    # parser_show_sandbox.add_argument(
-    #     "-f",
-    #     "--config",
-    #     default=os.path.expandvars("$HOME/.hive/config.yaml"),
-    #     help="Path to the config file, default to ~/.hive/config.yaml",
-    # ).completer = config_file_completer
-    # parser_show_sandbox.add_argument(
-    #     "-exp",
-    #     "--experiment",
-    #     help="Name of the experiment running sandboxes",
-    # ).completer = experiment_completer
-    # parser_show_sandbox.set_defaults(func=show_sandbox_cli)
-
-    # # dashboard command
-    # parser_dashboard = subparsers.add_parser("dashboard", help="Open the Hive dashboard")
-    # parser_dashboard.add_argument(
-    #     "--port",
-    #     default=9090,
-    #     type=int,
-    #     help="Port to run the dashboard on, default to 9090",
-    # )
-    # parser_dashboard.add_argument(
-    #     "-f",
-    #     "--config",
-    #     default=os.path.expandvars("$HOME/.hive/config.yaml"),
-    #     help="Path to the config file, default to ~/.hive/config.yaml",
-    # ).completer = config_file_completer
-    # parser_dashboard.set_defaults(func=show_dashboard_cli)
-
-    # # version command
-    # parser_version = subparsers.add_parser("version", help="Show Hive CLI version")
-    # parser_version.set_defaults(func=lambda args: print(f"Hive CLI version {__version__}"))
-
-    # # log command
-    # parser_log = subparsers.add_parser("log", help="Show Sandbox logs")
-    # parser_log.add_argument("sandbox", help="Name of the sandbox to fetch logs for").completer = sandbox_completer
-    # parser_log.add_argument(
-    #     "-f",
-    #     "--config",
-    #     default=os.path.expandvars("$HOME/.hive/config.yaml"),
-    #     help="Path to the config file, default to ~/.hive/config.yaml",
-    # ).completer = config_file_completer
-    # parser_log.add_argument(
-    #     "-t",
-    #     "--tail",
-    #     default=100,
-    #     type=int,
-    #     help="Number of lines to show from the end of the logs, default to 100",
-    # )
-    # parser_log.set_defaults(func=display_sandbox_logs_cli)
-
-    # argcomplete.autocomplete(parser)
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
     if hasattr(args, "func"):
         args.func(args)

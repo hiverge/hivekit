@@ -2,7 +2,7 @@ import hashlib
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from src.cli.utils.time import now_2_hash
+from cli.utils.time import now_2_hash
 
 
 def test_now_2_hash():
@@ -14,13 +14,13 @@ def test_now_2_hash():
         def now(cls, tz=None):
             return fixed_datetime
 
-    with patch("src.cli.utils.time.datetime", FixedDateTime):
+    with patch("cli.utils.time.datetime", FixedDateTime):
         expected_hash = hashlib.sha1(str(fixed_timestamp).encode()).hexdigest()[:7]
         assert now_2_hash() == expected_hash
 
 
 def test_humanize_time():
-    from src.cli.utils.time import humanize_time
+    from cli.utils.time import humanize_time
 
     fixed_now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -29,7 +29,7 @@ def test_humanize_time():
         def now(cls, tz=None):
             return fixed_now
 
-    with patch("src.cli.utils.time.datetime", FixedDateTime):
+    with patch("cli.utils.time.datetime", FixedDateTime):
         assert humanize_time("2024-01-01T11:59:30Z") == "30s"
         assert humanize_time("2024-01-01T11:50:00Z") == "10m"
         assert humanize_time("2024-01-01T10:00:00Z") == "2h"
