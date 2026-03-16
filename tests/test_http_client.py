@@ -23,7 +23,7 @@ class TestHttpClientInit:
         client = HttpClient()
 
         assert client.auth_token == "test-token"
-        assert client.base_url == "http://localhost:8080/api/v1"
+        assert client.base_url == "https://platform.hiverge.ai/api/v1"
         assert client.token_path == os.path.expandvars("$HOME/.hive/token")
 
     @patch("cli.http_client.os.path.exists")
