@@ -19,7 +19,9 @@ class HttpClient:
             base_url: Base URL of the backend server (defaults to env var HIVE_API_ENDPOINT)
             token_path: Path to JWT token file (defaults to ~/.hive/token)
         """
-        self.base_url = base_url or os.getenv("HIVE_API_ENDPOINT", "http://localhost:8080/api/v1")
+        self.base_url = base_url or os.getenv(
+            "HIVE_API_ENDPOINT", "https://platform.hiverge.ai/api/v1"
+        )
 
         # Read JWT token from file
         self.token_path = token_path or os.path.expandvars("$HOME/.hive/token")

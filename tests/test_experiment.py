@@ -54,9 +54,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_runtime_config(self):
         """Test building CRD with custom runtime config."""
         config = HiveConfig(
-            runtime=RuntimeConfig(
-                num_agents=5, max_runtime_seconds=3600, max_iterations=100
-            ),
+            runtime=RuntimeConfig(num_agents=5, max_runtime_seconds=3600, max_iterations=100),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
@@ -331,18 +329,14 @@ class TestGenerateExperimentName:
         # 64 character name
         name = "a" * 64
 
-        with pytest.raises(
-            ValueError, match="Experiment name must be no more than 63 characters"
-        ):
+        with pytest.raises(ValueError, match="Experiment name must be no more than 63 characters"):
             generate_experiment_name(name)
 
     def test_generate_name_long_example(self):
         """Test the real-world long name example."""
         long_name = "maxcut-qaoa--evolve-p--optimise-mean90--multi-n--again-coordinator"
 
-        with pytest.raises(
-            ValueError, match="Experiment name must be no more than 63 characters"
-        ):
+        with pytest.raises(ValueError, match="Experiment name must be no more than 63 characters"):
             generate_experiment_name(long_name)
 
     @patch("cli.experiment.utiltime.now_2_hash")
@@ -353,9 +347,7 @@ class TestGenerateExperimentName:
         # Base name of 57 chars + "-" + 7 char hash = 65 chars total
         base_name = "a" * 57 + "-"
 
-        with pytest.raises(
-            ValueError, match="Experiment name must be no more than 63 characters"
-        ):
+        with pytest.raises(ValueError, match="Experiment name must be no more than 63 characters"):
             generate_experiment_name(base_name)
 
     @patch("cli.experiment.utiltime.now_2_hash")
