@@ -52,12 +52,6 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
     if config.sandbox.image:
         experiment["spec"]["sandbox"]["image"] = config.sandbox.image
 
-    if config.sandbox.build_args:
-        experiment["spec"]["sandbox"]["buildArgs"] = config.sandbox.build_args
-
-    if config.sandbox.build_secret:
-        experiment["spec"]["sandbox"]["buildSecret"] = config.sandbox.build_secret
-
     if config.sandbox.resources.accelerators:
         experiment["spec"]["sandbox"]["resources"]["accelerators"] = (
             config.sandbox.resources.accelerators
@@ -78,7 +72,7 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
 
     if config.sandbox.preprocessor:
         experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.preprocessor
-    elif config.sandbox.pre_processor:
+    elif getattr(config.sandbox, "pre_processor", None):
         # Handle deprecated field
         experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.pre_processor
 
