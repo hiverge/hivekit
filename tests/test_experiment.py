@@ -316,3 +316,57 @@ class TestGenerateExperimentName:
         result = generate_experiment_name("my-test-exp")
 
         assert result == "my-test-exp"
+
+    def test_generate_name_exactly_63_chars(self):
+        """Test generating name with exactly 63 characters (max allowed)."""
+        # 63 character name
+        name = "a" * 63
+        result = generate_experiment_name(name)
+
+        assert result == name
+        assert len(result) == 63
+
+    def test_generate_name_exceeds_63_chars(self):
+        """Test that names exceeding 63 characters raise ValueError."""
+        # 64 character name
+        name = "a" * 64
+
+        with pytest.raises(
+            ValueError, match="Experiment name must be no more than 63 characters"
+        ):
+            generate_experiment_name(name)
+
+    def test_generate_name_long_example(self):
+        """Test the real-world long name example."""
+        long_name = "maxcut-qaoa--evolve-p--optimise-mean90--multi-n--again-coordinator"
+
+        with pytest.raises(
+            ValueError, match="Experiment name must be no more than 63 characters"
+        ):
+            generate_experiment_name(long_name)
+
+    @patch("cli.experiment.utiltime.now_2_hash")
+    def test_generate_name_with_timestamp_exceeds_limit(self, mock_hash):
+        """Test that base name + timestamp exceeding 63 chars raises ValueError."""
+        mock_hash.return_value = "abc1234"  # 7 characters
+
+        # Base name of 57 chars + "-" + 7 char hash = 65 chars total
+        base_name = "a" * 57 + "-"
+
+        with pytest.raises(
+            ValueError, match="Experiment name must be no more than 63 characters"
+        ):
+            generate_experiment_name(base_name)
+
+    @patch("cli.experiment.utiltime.now_2_hash")
+    def test_generate_name_with_timestamp_exactly_63_chars(self, mock_hash):
+        """Test that base name + timestamp with exactly 63 chars succeeds."""
+        mock_hash.return_value = "abc1234"  # 7 characters
+
+        # Base name: 56 chars including the dash + 7 char hash = 63 chars total
+        base_name = "a" * 55 + "-"  # 56 chars total with the dash
+
+        result = generate_experiment_name(base_name)
+
+        assert len(result) == 63  # 56 + 7
+        assert result == ("a" * 55) + "-abc1234"

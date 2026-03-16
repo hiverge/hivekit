@@ -136,6 +136,9 @@ def generate_experiment_name(base_name: str) -> str:
     """
     Generate a unique experiment name based on the base name and current timestamp.
     If the base name ends with '-', it will be suffixed with a timestamp.
+
+    Raises:
+        ValueError: If the name contains uppercase characters or exceeds 63 characters
     """
 
     if any(c.isupper() for c in base_name):
@@ -147,5 +150,11 @@ def generate_experiment_name(base_name: str) -> str:
     if experiment_name.endswith("-"):
         hash = utiltime.now_2_hash()
         experiment_name = f"{base_name}{hash}"
+
+    # Kubernetes DNS label limit (RFC 1123)
+    if len(experiment_name) > 63:
+        raise ValueError(
+            f"Experiment name must be no more than 63 characters, got {len(experiment_name)}: '{experiment_name}'"
+        )
 
     return experiment_name
