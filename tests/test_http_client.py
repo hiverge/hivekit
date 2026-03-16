@@ -161,9 +161,7 @@ class TestHttpClientGetExperiment:
         mock_exists.return_value = True
         client = HttpClient()
 
-        client.session.get = MagicMock(
-            side_effect=requests.exceptions.RequestException("Error")
-        )
+        client.session.get = MagicMock(side_effect=requests.exceptions.RequestException("Error"))
 
         with pytest.raises(Exception, match="Failed to get experiment"):
             client.get_experiment("test-exp")
@@ -197,9 +195,7 @@ class TestHttpClientListExperiments:
         mock_exists.return_value = True
         client = HttpClient()
 
-        client.session.get = MagicMock(
-            side_effect=requests.exceptions.RequestException("Error")
-        )
+        client.session.get = MagicMock(side_effect=requests.exceptions.RequestException("Error"))
 
         with pytest.raises(Exception, match="Failed to list experiments"):
             client.list_experiments()
@@ -231,9 +227,7 @@ class TestHttpClientDeleteExperiment:
         mock_exists.return_value = True
         client = HttpClient()
 
-        client.session.delete = MagicMock(
-            side_effect=requests.exceptions.RequestException("Error")
-        )
+        client.session.delete = MagicMock(side_effect=requests.exceptions.RequestException("Error"))
 
         with pytest.raises(Exception, match="Failed to delete experiment"):
             client.delete_experiment("test-exp")
