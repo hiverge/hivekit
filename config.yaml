@@ -1,0 +1,31 @@
+# This is only an example configuration file for the Hive CLI.
+
+repo:
+  source: https://github.com/hiverge/demo-project.git
+  branch: main
+  evaluation_script: evaluator.py
+  evolve_files_and_ranges: main.py
+runtime:
+  num_agents: 5
+  max_runtime_seconds: 7200
+  max_iterations: 100
+sandbox:
+  timeout: 1800
+  resources:
+    cpu: "500m"
+    memory: "1Gi"
+    shmsize: "1Gi"
+    accelerators: a100-80gb:8
+  envs:
+    - name: foo
+      value: bar
+prompt:
+  enable_evolution: false
+  context: foo
+  ideas:
+    - foo
+    - bar
+provider:
+  gcp:
+    spot: true
+    enabled: true

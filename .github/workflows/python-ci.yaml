@@ -1,0 +1,39 @@
+name: Python CI
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: yezz123/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev,test]"
+
+      - name: Lint
+        run: uv run make lint
+
+      - name: Run HiveKit Tests
+        run: |
+          mkdir -p test-reports
+          source .venv/bin/activate
+          make test
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: test-reports/report.xml
