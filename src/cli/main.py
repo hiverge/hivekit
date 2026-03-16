@@ -205,7 +205,11 @@ def delete_experiment(args) -> None:
 
     # Confirm deletion unless -y flag is set
     if not args.yes:
-        response = input(f"Are you sure you want to delete experiment '{experiment_name}'? (y/N): ").strip().lower()
+        response = (
+            input(f"Are you sure you want to delete experiment '{experiment_name}'? (y/N): ")
+            .strip()
+            .lower()
+        )
         if response not in ["y", "yes"]:
             console.print("[yellow]Deletion cancelled.[/yellow]")
             return
@@ -268,12 +272,7 @@ def list_experiments(args) -> None:
             phase = status.get("phase", "Unknown")
             created = metadata.get("creationTimestamp", "N/A")
 
-            table.add_row(
-                name,
-                str(num_agents),
-                phase,
-                created
-            )
+            table.add_row(name, str(num_agents), phase, created)
 
         console.print("\n")
         console.print(table)
@@ -321,30 +320,30 @@ def get_experiment(args) -> None:
 
         # Display labels if present
         if metadata.get("labels"):
-            console.print(f"  [cyan]Labels:[/cyan]")
+            console.print("  [cyan]Labels:[/cyan]")
             for key, value in metadata["labels"].items():
                 console.print(f"    {key}: {value}")
 
         # Display spec
         console.print("\n[bold magenta]Spec:[/bold magenta]")
         runtime = spec.get("runtime", {})
-        console.print(f"  [cyan]Runtime:[/cyan]")
+        console.print("  [cyan]Runtime:[/cyan]")
         console.print(f"    Agents: {runtime.get('numAgents', 'N/A')}")
         console.print(f"    Max Runtime: {runtime.get('maxRuntimeSeconds', 'N/A')}s")
         console.print(f"    Max Iterations: {runtime.get('maxIterations', 'N/A')}")
 
         repo = spec.get("repo", {})
-        console.print(f"  [cyan]Repository:[/cyan]")
+        console.print("  [cyan]Repository:[/cyan]")
         console.print(f"    Source: {repo.get('source', 'N/A')}")
         console.print(f"    Branch: {repo.get('branch', 'N/A')}")
         console.print(f"    Evaluation Script: {repo.get('evaluationScript', 'N/A')}")
 
         sandbox = spec.get("sandbox", {})
-        console.print(f"  [cyan]Sandbox:[/cyan]")
+        console.print("  [cyan]Sandbox:[/cyan]")
         console.print(f"    Timeout: {sandbox.get('timeout', 'N/A')}s")
         resources = sandbox.get("resources", {})
         if resources:
-            console.print(f"    Resources:")
+            console.print("    Resources:")
             console.print(f"      CPU: {resources.get('cpu', 'N/A')}")
             console.print(f"      Memory: {resources.get('memory', 'N/A')}")
 
@@ -409,7 +408,9 @@ def main():
     parser_delete_exp = delete_subparsers.add_parser(
         "experiment", aliases=["exp"], help="Delete an experiment"
     )
-    parser_delete_exp.add_argument("name", help="Name of the experiment").completer = experiment_completer
+    parser_delete_exp.add_argument(
+        "name", help="Name of the experiment"
+    ).completer = experiment_completer
     parser_delete_exp.add_argument(
         "-y",
         "--yes",
@@ -442,7 +443,9 @@ def main():
     parser_get_exp = get_subparsers.add_parser(
         "experiment", aliases=["exp"], help="Get experiment details"
     )
-    parser_get_exp.add_argument("name", help="Name of the experiment").completer = experiment_completer
+    parser_get_exp.add_argument(
+        "name", help="Name of the experiment"
+    ).completer = experiment_completer
     parser_get_exp.set_defaults(func=get_experiment)
 
     # show command (alias for list, for backward compatibility)
