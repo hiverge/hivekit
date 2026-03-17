@@ -1,6 +1,6 @@
 from argcomplete.completers import FilesCompleter
 
-from cli.http_client import HttpClient
+from cli.http_client import create_http_client
 
 
 def config_file_completer(prefix, **kwargs):
@@ -15,12 +15,10 @@ def config_file_completer(prefix, **kwargs):
 def experiment_completer(prefix, **kwargs):
     """Autocomplete for experiment names by fetching from the server."""
     try:
-        # Initialize HTTP client
-        client = HttpClient()
+        import os
 
-        # Skip if no token available
-        if not client.auth_token:
-            return []
+        base_url = os.getenv("HIVE_API_ENDPOINT", "https://platform.hiverge.ai/api/v1")
+        client = create_http_client(base_url=base_url, no_auth=True)
 
         # Fetch experiments from server
         result = client.list_experiments()
