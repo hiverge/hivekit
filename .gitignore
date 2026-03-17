@@ -209,3 +209,5 @@ __marimo__/
 /tmp
 /test-reports
 .DS_Store
+/CLAUDE.md
+/.idea
