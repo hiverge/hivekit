@@ -10,12 +10,15 @@ back to file-based storage if the keyring is unavailable.
 import base64
 import hashlib
 import json
+import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
 import keyring
 from cryptography.fernet import Fernet
+
+logger = logging.getLogger("hivekit")
 
 
 class TokenEncryptor:
@@ -28,7 +31,7 @@ class TokenEncryptor:
     inspection of stored credentials.
     """
 
-    def __init__(self, *, machine_id: str) -> None:
+    def __init__(self, machine_id: str) -> None:
         """
         Initialize the encryptor.
 
@@ -38,13 +41,13 @@ class TokenEncryptor:
         key = base64.urlsafe_b64encode(hashlib.sha256(machine_id.encode()).digest())
         self._fernet = Fernet(key)
 
-    def encrypt(self, *, token: dict) -> str:
+    def encrypt(self, token: dict) -> str:
         """
         Serialize and encrypt a token dict, returning a UTF-8 string.
         """
         return self._fernet.encrypt(json.dumps(token).encode()).decode()
 
-    def decrypt(self, *, data: str) -> dict:
+    def decrypt(self, data: str) -> dict:
         """
         Decrypt and deserialize an encrypted token string back to a dict.
         """
@@ -57,13 +60,13 @@ class CredentialStore(ABC):
     """
 
     @abstractmethod
-    def save_token(self, *, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: dict) -> None:
         """
         Persist an OAuth token for the given organization.
         """
 
     @abstractmethod
-    def load_token(self, *, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[dict]:
         """
         Load a previously stored OAuth token for the given organization.
 
@@ -71,7 +74,7 @@ class CredentialStore(ABC):
         """
 
     @abstractmethod
-    def delete_token(self, *, organization_id: str) -> None:
+    def delete_token(self, organization_id: str) -> None:
         """
         Delete a stored OAuth token for the given organization.
         """
@@ -85,7 +88,7 @@ class KeyringCredentialStore(CredentialStore):
     key is the machine ID, so this is not a strong control).
     """
 
-    def __init__(self, *, keyring_backend: Any, encryptor: TokenEncryptor) -> None:
+    def __init__(self, keyring_backend: Any, encryptor: TokenEncryptor) -> None:
         """
         Initialize the keyring credential store.
 
@@ -97,23 +100,31 @@ class KeyringCredentialStore(CredentialStore):
         self._keyring = keyring_backend
         self._encryptor = encryptor
 
-    def save_token(self, *, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: dict) -> None:
         """
         Encrypt and save an OAuth token to the system keyring.
         """
         encrypted = self._encryptor.encrypt(token=token)
         self._keyring.set_password("hivekit", organization_id, encrypted)
 
-    def load_token(self, *, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[dict]:
         """
         Load and decrypt an OAuth token from the system keyring.
         """
         raw = self._keyring.get_password("hivekit", organization_id)
         if raw is None:
+            logger.info(f"No stored token found in keyring for organization '{organization_id}'.")
             return None
-        return self._encryptor.decrypt(data=raw)
+        try:
+            return self._encryptor.decrypt(data=raw)
+        except Exception:
+            logger.warning(
+                f"Failed to read stored token from keyring for organization '{organization_id}'. "
+                "The token may be corrupted or the machine ID may have changed."
+            )
+            return None
 
-    def delete_token(self, *, organization_id: str) -> None:
+    def delete_token(self, organization_id: str) -> None:
         """
         Delete an OAuth token from the system keyring.
         """
@@ -128,7 +139,7 @@ class FileCredentialStore(CredentialStore):
     key is the machine ID, so this is not a strong control).
     """
 
-    def __init__(self, *, clients_dir: str, encryptor: TokenEncryptor) -> None:
+    def __init__(self, clients_dir: str, encryptor: TokenEncryptor) -> None:
         """
         Initialize the file-based credential store.
 
@@ -139,7 +150,7 @@ class FileCredentialStore(CredentialStore):
         self._clients_dir = clients_dir
         self._encryptor = encryptor
 
-    def save_token(self, *, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: dict) -> None:
         """
         Encrypt and save an OAuth token to a file.
         """
@@ -149,18 +160,26 @@ class FileCredentialStore(CredentialStore):
         with open(path, "w") as f:
             f.write(encrypted)
 
-    def load_token(self, *, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[dict]:
         """
         Load and decrypt an OAuth token from a file.
         """
         path = self._token_path(organization_id=organization_id)
         if not os.path.exists(path):
+            logger.info(f"No stored token file found for organization '{organization_id}' at {path}.")
             return None
-        with open(path, "r") as f:
-            encrypted = f.read()
-        return self._encryptor.decrypt(data=encrypted)
+        try:
+            with open(path, "r") as f:
+                encrypted = f.read()
+            return self._encryptor.decrypt(data=encrypted)
+        except Exception:
+            logger.warning(
+                f"Failed to read stored token for organization '{organization_id}' from {path}. "
+                "The token may be corrupted or the machine ID may have changed."
+            )
+            return None
 
-    def delete_token(self, *, organization_id: str) -> None:
+    def delete_token(self, organization_id: str) -> None:
         """
         Delete a stored credential file.
         """
@@ -168,7 +187,7 @@ class FileCredentialStore(CredentialStore):
         if os.path.exists(path):
             os.remove(path)
 
-    def _token_path(self, *, organization_id: str) -> str:
+    def _token_path(self, organization_id: str) -> str:
         """
         Return the file path for the given organization's credential file.
         """
@@ -176,7 +195,7 @@ class FileCredentialStore(CredentialStore):
 
 
 def create_credential_store(
-    *, clients_dir: str, machine_id_func: Callable[[], str]
+    clients_dir: str, machine_id_func: Callable[[], str]
 ) -> CredentialStore:
     """
     Create a credential store, preferring keyring if available.
@@ -195,6 +214,9 @@ def create_credential_store(
         keyring.get_password("hivekit", "_probe")
         return KeyringCredentialStore(keyring_backend=keyring, encryptor=encryptor)
     except Exception:
+        logger.warning(
+            "System keyring is not available. Credentials will be stored in the filesystem."
+        )
         return FileCredentialStore(
             clients_dir=clients_dir,
             encryptor=encryptor,

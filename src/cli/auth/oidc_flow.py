@@ -58,7 +58,7 @@ class CallbackServer:
         """
         return f"http://{_CALLBACK_HOST}:{_CALLBACK_PORT}/callback"
 
-    def wait_for_callback(self, *, timeout: int = 120) -> str:
+    def wait_for_callback(self, timeout: int = 120) -> str:
         """
         Block until the authorization callback is received.
 
@@ -84,7 +84,6 @@ class OidcLoginFlow:
 
     def __init__(
         self,
-        *,
         identity_base_url: str,
         organization_id: str,
         credential_store: CredentialStore,
@@ -138,7 +137,7 @@ class OidcLoginFlow:
         finally:
             callback_server.shutdown()
 
-    def _perform_login(self, *, endpoints: dict, callback_server: CallbackServer) -> dict:
+    def _perform_login(self, endpoints: dict, callback_server: CallbackServer) -> dict:
         """
         Perform the login steps: create session, open browser, exchange code, save token.
         """
@@ -171,7 +170,7 @@ class OidcLoginFlow:
 
         return token
 
-    def _open_browser(self, *, url: str) -> None:
+    def _open_browser(self, url: str) -> None:
         """
         Attempt to open the authorization URL in the user's browser.
         Falls back to printing the URL if the browser cannot be opened.

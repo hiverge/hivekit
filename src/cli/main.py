@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import subprocess
 from importlib.metadata import PackageNotFoundError, version
@@ -10,12 +11,15 @@ from rich.table import Table
 from rich.text import Text
 
 from cli import experiment
+from cli.auth.auth_utils import get_machine_id
 from cli.auth.credential_store import create_credential_store
 from cli.auth.oidc_flow import OidcLoginFlow
 from cli.completers import config_file_completer, experiment_completer
 from cli.config import load_config
-from cli.http_client import AuthenticationError, HttpClient, create_http_client
-from cli.utils.url_utils import derive_identity_base_url
+from cli.http_client import AuthenticationError, build_http_client
+from cli.utils.url_utils import derive_identity_base_url, get_api_endpoint
+
+logger = logging.getLogger("hivekit")
 
 try:
     __version__ = version("hivekit")
@@ -24,73 +28,6 @@ except PackageNotFoundError:
 
 _CONFIG_DIR = os.path.expandvars("$HOME/.hive")
 _CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.yaml")
-
-
-def _get_api_endpoint() -> str:
-    """
-    Return the API endpoint from the environment or the default.
-    """
-    return os.getenv("HIVE_API_ENDPOINT", "https://platform.hiverge.ai/api/v1")
-
-
-def _build_http_client(args) -> HttpClient:
-    """
-    Build an authenticated HttpClient from the parsed CLI args.
-
-    Loads the organization_id from the config file and sets up credential
-    storage and the OIDC login flow.
-    """
-    base_url = _get_api_endpoint()
-    no_auth = getattr(args, "no_auth", False)
-    insecure = getattr(args, "insecure", False)
-
-    if no_auth:
-        return create_http_client(base_url=base_url, no_auth=True, insecure=insecure)
-
-    # Try to load org ID from config
-    organization_id = None
-    if os.path.exists(_CONFIG_PATH):
-        with open(_CONFIG_PATH, "r") as f:
-            raw_config = yaml.safe_load(f) or {}
-        organization_id = raw_config.get("organization_id")
-
-    credential_store = None
-    login_flow = None
-    if organization_id is not None:
-        credential_store = create_credential_store(
-            clients_dir=os.path.join(_CONFIG_DIR, "clients"),
-            machine_id_func=_get_machine_id,
-        )
-        identity_base_url = derive_identity_base_url(api_endpoint=base_url)
-        login_flow = OidcLoginFlow(
-            identity_base_url=identity_base_url,
-            organization_id=organization_id,
-            credential_store=credential_store,
-            insecure=insecure,
-        )
-
-    return create_http_client(
-        base_url=base_url,
-        no_auth=False,
-        insecure=insecure,
-        organization_id=organization_id,
-        credential_store=credential_store,
-        login_flow=login_flow,
-    )
-
-
-def _get_machine_id() -> str:
-    """
-    Return a machine-specific identifier for file-based credential encryption.
-    """
-    try:
-        import machineid
-
-        return machineid.id()
-    except Exception:
-        import uuid
-
-        return str(uuid.getnode())
 
 
 def init(args) -> None:
@@ -201,24 +138,25 @@ provider:
     # Log in if no existing credentials for this organization
     credential_store = create_credential_store(
         clients_dir=os.path.join(_CONFIG_DIR, "clients"),
-        machine_id_func=_get_machine_id,
+        machine_id_func=get_machine_id,
     )
     existing_token = credential_store.load_token(organization_id=organization_id)
     if existing_token is None:
+        logger.info(f"No existing credentials for organization '{organization_id}'. Initiating login.")
         console.print()
         insecure = getattr(args, "insecure", False)
         _run_login(console=console, organization_id=organization_id, insecure=insecure)
 
 
-def _run_login(*, console: Console, organization_id: str, insecure: bool = False) -> None:
+def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
     """
     Run the OIDC login flow for the given organization.
     """
-    base_url = _get_api_endpoint()
+    base_url = get_api_endpoint()
     identity_base_url = derive_identity_base_url(api_endpoint=base_url)
     credential_store = create_credential_store(
         clients_dir=os.path.join(_CONFIG_DIR, "clients"),
-        machine_id_func=_get_machine_id,
+        machine_id_func=get_machine_id,
     )
     flow = OidcLoginFlow(
         identity_base_url=identity_base_url,
@@ -262,6 +200,49 @@ def login(args) -> None:
     _run_login(console=console, organization_id=organization_id, insecure=insecure)
 
 
+def logout(args) -> None:
+    """Log out by clearing all stored credentials."""
+    console = Console()
+
+    clients_dir = os.path.join(_CONFIG_DIR, "clients")
+    credential_store = create_credential_store(
+        clients_dir=clients_dir,
+        machine_id_func=get_machine_id,
+    )
+
+    # Load organization ID from config if available
+    organization_ids = []
+    if os.path.exists(_CONFIG_PATH):
+        with open(_CONFIG_PATH, "r") as f:
+            raw_config = yaml.safe_load(f) or {}
+        org_id = raw_config.get("organization_id")
+        if org_id:
+            organization_ids.append(org_id)
+
+    # Also clear any file-based credentials by scanning the clients directory
+    if os.path.isdir(clients_dir):
+        for filename in os.listdir(clients_dir):
+            if filename.endswith("_client"):
+                org_id = filename[: -len("_client")]
+                if org_id not in organization_ids:
+                    organization_ids.append(org_id)
+
+    if not organization_ids:
+        console.print("[yellow]No stored credentials found.[/yellow]")
+        return
+
+    for org_id in organization_ids:
+        try:
+            credential_store.delete_token(organization_id=org_id)
+        except Exception:
+            pass
+
+    console.print(
+        f"[bold green]✓ Cleared credentials for {len(organization_ids)} "
+        f"organization(s).[/bold green]"
+    )
+
+
 def edit_cli(args):
     editor = os.environ.get("EDITOR", "vim")
     subprocess.run([editor, args.config])
@@ -301,7 +282,12 @@ def create_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = _build_http_client(args)
+        client = build_http_client(
+            no_auth=getattr(args, "no_auth", False),
+            insecure=getattr(args, "insecure", False),
+            config_dir=_CONFIG_DIR,
+            config_path=_CONFIG_PATH,
+        )
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -341,7 +327,12 @@ def delete_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = _build_http_client(args)
+        client = build_http_client(
+            no_auth=getattr(args, "no_auth", False),
+            insecure=getattr(args, "insecure", False),
+            config_dir=_CONFIG_DIR,
+            config_path=_CONFIG_PATH,
+        )
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -383,7 +374,12 @@ def list_experiments(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = _build_http_client(args)
+        client = build_http_client(
+            no_auth=getattr(args, "no_auth", False),
+            insecure=getattr(args, "insecure", False),
+            config_dir=_CONFIG_DIR,
+            config_path=_CONFIG_PATH,
+        )
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -440,7 +436,12 @@ def get_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = _build_http_client(args)
+        client = build_http_client(
+            no_auth=getattr(args, "no_auth", False),
+            insecure=getattr(args, "insecure", False),
+            config_dir=_CONFIG_DIR,
+            config_path=_CONFIG_PATH,
+        )
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -526,6 +527,10 @@ def main():
     # login command
     parser_login = subparsers.add_parser("login", help="Log in to the Hive platform")
     parser_login.set_defaults(func=login)
+
+    # logout command
+    parser_logout = subparsers.add_parser("logout", help="Log out and clear stored credentials")
+    parser_logout.set_defaults(func=logout)
 
     # edit command
     parser_edit = subparsers.add_parser("edit", help="Edit Hive configuration")

@@ -1,11 +1,22 @@
 """
-Utility functions for deriving OIDC-related URLs from the API endpoint.
+Utility functions for deriving OIDC-related URLs and the API endpoint.
 """
 
+import os
 from urllib.parse import urlparse
 
+_DEFAULT_API_ENDPOINT = "https://platform.hiverge.ai/api/v1"
 
-def derive_identity_base_url(*, api_endpoint: str) -> str:
+
+def get_api_endpoint() -> str:
+    """
+    Return the API endpoint from the HIVE_API_ENDPOINT environment variable,
+    or the default if not set.
+    """
+    return os.getenv("HIVE_API_ENDPOINT", _DEFAULT_API_ENDPOINT)
+
+
+def derive_identity_base_url(api_endpoint: str) -> str:
     """
     Derive the identity provider base URL from the API endpoint.
 
@@ -17,7 +28,7 @@ def derive_identity_base_url(*, api_endpoint: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}/identity"
 
 
-def build_oidc_endpoints(*, identity_base_url: str, organization_id: str) -> dict[str, str]:
+def build_oidc_endpoints(identity_base_url: str, organization_id: str) -> dict[str, str]:
     """
     Build the OIDC endpoint URLs for a given organization.
 

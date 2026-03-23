@@ -1,10 +1,43 @@
 """
-Tests for the URL utility functions in the auth module.
+Tests for the URL utility functions.
 """
+
+import os
+from unittest.mock import patch
 
 import pytest
 
-from cli.utils.url_utils import build_oidc_endpoints, derive_identity_base_url
+from cli.utils.url_utils import build_oidc_endpoints, derive_identity_base_url, get_api_endpoint
+
+
+class TestGetApiEndpoint:
+    """
+    Tests for the `get_api_endpoint` function.
+    """
+
+    def test_returns_default_when_env_not_set(self) -> None:
+        """
+        Test that the default API endpoint is returned when the environment
+        variable is not set.
+        """
+        # given
+        with patch.dict(os.environ, {}, clear=True):
+            # when
+            result = get_api_endpoint()
+
+        # then
+        assert result == "https://platform.hiverge.ai/api/v1"
+
+    @patch.dict(os.environ, {"HIVE_API_ENDPOINT": "https://custom.example.com/api"})
+    def test_returns_env_variable_when_set(self) -> None:
+        """
+        Test that the HIVE_API_ENDPOINT environment variable is used when set.
+        """
+        # when
+        result = get_api_endpoint()
+
+        # then
+        assert result == "https://custom.example.com/api"
 
 
 class TestDeriveIdentityBaseUrl:

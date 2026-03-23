@@ -12,7 +12,7 @@ class TestExperimentCompleter:
     Tests for the `experiment_completer` function.
     """
 
-    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.build_http_client")
     def test_experiment_completer_success(self, mock_create_client):
         """
         Test that experiment_completer successfully fetches and returns experiment names.
@@ -36,7 +36,7 @@ class TestExperimentCompleter:
         mock_create_client.assert_called_once()
         mock_client.list_experiments.assert_called_once()
 
-    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.build_http_client")
     def test_experiment_completer_with_prefix(self, mock_create_client):
         """
         Test that experiment_completer filters results by prefix.
@@ -58,7 +58,7 @@ class TestExperimentCompleter:
         # then
         assert result == ["exp-1", "exp-2"]
 
-    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.build_http_client")
     def test_experiment_completer_api_error(self, mock_create_client):
         """
         Test that experiment_completer returns an empty list on API error.
@@ -74,7 +74,7 @@ class TestExperimentCompleter:
         # then
         assert result == []
 
-    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.build_http_client")
     def test_experiment_completer_empty_response(self, mock_create_client):
         """
         Test that experiment_completer handles an empty API response.
@@ -90,7 +90,7 @@ class TestExperimentCompleter:
         # then
         assert result == []
 
-    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.build_http_client")
     def test_experiment_completer_missing_metadata(self, mock_create_client):
         """
         Test that experiment_completer handles experiments with missing metadata.
