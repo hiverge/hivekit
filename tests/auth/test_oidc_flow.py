@@ -6,16 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cli.auth.credential_store import CredentialStore
 from cli.auth.oidc_flow import OidcLoginFlow
-
-
-@pytest.fixture(name="mock_credential_store")
-def _mock_credential_store() -> MagicMock:
-    """
-    A mock credential store.
-    """
-    return MagicMock(spec=CredentialStore)
 
 
 @pytest.fixture(name="mock_callback_server")
@@ -57,7 +48,6 @@ class TestOidcLoginFlow:
 
     def test_login_opens_browser_with_authorization_url(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -69,7 +59,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=mock_browser_opener,
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -85,7 +74,6 @@ class TestOidcLoginFlow:
 
     def test_login_exchanges_code_for_tokens(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -96,7 +84,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -111,42 +98,8 @@ class TestOidcLoginFlow:
             authorization_response="http://127.0.0.1:54422/callback?code=auth-code-123&state=test-state",
         )
 
-    def test_login_saves_tokens_to_credential_store(
-        self,
-        mock_credential_store: MagicMock,
-        mock_callback_server: MagicMock,
-        mock_session: MagicMock,
-    ) -> None:
-        """
-        Test that the login flow saves the fetched tokens to the credential store.
-        """
-        # given
-        flow = OidcLoginFlow(
-            identity_base_url="https://identity.example.com",
-            organization_id="my-org",
-            credential_store=mock_credential_store,
-            browser_opener=MagicMock(),
-            callback_server_factory=lambda: mock_callback_server,
-            session_factory=lambda **kwargs: mock_session,
-        )
-
-        # when
-        flow.login()
-
-        # then
-        mock_credential_store.save_token.assert_called_once_with(
-            organization_id="my-org",
-            token={
-                "access_token": "new-access-token",
-                "refresh_token": "new-refresh-token",
-                "token_type": "Bearer",
-                "expires_in": 300,
-            },
-        )
-
     def test_login_returns_token(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -157,7 +110,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -176,7 +128,6 @@ class TestOidcLoginFlow:
 
     def test_login_shuts_down_callback_server(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -187,7 +138,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -201,7 +151,6 @@ class TestOidcLoginFlow:
 
     def test_login_prints_url_when_browser_fails(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -215,7 +164,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=mock_browser_opener,
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -239,7 +187,6 @@ class TestOidcLoginFlow:
 
     def test_login_creates_session_with_correct_params(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -256,7 +203,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=capturing_factory,
@@ -266,14 +212,15 @@ class TestOidcLoginFlow:
         flow.login()
 
         # then
-        assert captured_kwargs["client_id"] == "hiverge"
-        assert captured_kwargs["redirect_uri"] == "http://127.0.0.1:54422/callback"
-        assert captured_kwargs["scope"] == "openid"
-        assert captured_kwargs["code_challenge_method"] == "S256"
+        assert captured_kwargs == {
+            "client_id": "hiverge",
+            "redirect_uri": "http://127.0.0.1:54422/callback",
+            "scope": "openid",
+            "code_challenge_method": "S256",
+        }
 
     def test_login_shuts_down_server_on_error(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -286,7 +233,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -301,7 +247,6 @@ class TestOidcLoginFlow:
 
     def test_insecure_disables_ssl_on_session(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -313,7 +258,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,
@@ -328,7 +272,6 @@ class TestOidcLoginFlow:
 
     def test_secure_by_default_does_not_set_verify(
         self,
-        mock_credential_store: MagicMock,
         mock_callback_server: MagicMock,
         mock_session: MagicMock,
     ) -> None:
@@ -341,7 +284,6 @@ class TestOidcLoginFlow:
         flow = OidcLoginFlow(
             identity_base_url="https://identity.example.com",
             organization_id="my-org",
-            credential_store=mock_credential_store,
             browser_opener=MagicMock(),
             callback_server_factory=lambda: mock_callback_server,
             session_factory=lambda **kwargs: mock_session,

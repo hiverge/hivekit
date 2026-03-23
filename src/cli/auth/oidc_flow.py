@@ -5,12 +5,11 @@ OIDC browser-based login flow using a local callback server.
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from authlib.integrations.requests_client import OAuth2Session
 from rich.console import Console
 
-from cli.auth.credential_store import CredentialStore
 from cli.auth.login_page import LOGIN_SUCCESS_HTML
 from cli.utils.url_utils import build_oidc_endpoints
 
@@ -86,7 +85,6 @@ class OidcLoginFlow:
         self,
         identity_base_url: str,
         organization_id: str,
-        credential_store: CredentialStore,
         browser_opener: Callable[[str], None] = webbrowser.open,
         callback_server_factory: Callable[[], CallbackServer] = CallbackServer,
         session_factory: Callable[..., OAuth2Session] = OAuth2Session,
@@ -99,7 +97,6 @@ class OidcLoginFlow:
         Args:
             identity_base_url: The base URL for the identity provider.
             organization_id: The organization (Keycloak realm) to authenticate against.
-            credential_store: Where to persist the resulting tokens.
             browser_opener: Callable to open a URL in the browser.
             callback_server_factory: Factory for creating the local callback server.
             session_factory: Factory for creating an OAuth2Session.
@@ -108,20 +105,18 @@ class OidcLoginFlow:
         """
         self._identity_base_url = identity_base_url
         self._organization_id = organization_id
-        self._credential_store = credential_store
         self._browser_opener = browser_opener
         self._callback_server_factory = callback_server_factory
         self._session_factory = session_factory
         self._console = console or Console()
         self._insecure = insecure
 
-    def login(self) -> dict:
+    def login(self) -> Dict[str, Any]:
         """
         Run the full OIDC login flow.
 
         Opens a browser for the user to authenticate, waits for the callback,
-        exchanges the authorization code for tokens, saves them, and returns
-        the token dict.
+        exchanges the authorization code for tokens, and returns the token dict.
         """
         endpoints = build_oidc_endpoints(
             identity_base_url=self._identity_base_url,
@@ -137,9 +132,9 @@ class OidcLoginFlow:
         finally:
             callback_server.shutdown()
 
-    def _perform_login(self, endpoints: dict, callback_server: CallbackServer) -> dict:
+    def _perform_login(self, endpoints: Dict[str, str], callback_server: CallbackServer) -> Dict[str, Any]:
         """
-        Perform the login steps: create session, open browser, exchange code, save token.
+        Perform the login steps: create session, open browser, and exchange code for tokens.
         """
         session = self._session_factory(
             client_id="hiverge",
@@ -158,17 +153,10 @@ class OidcLoginFlow:
 
         callback_url = callback_server.wait_for_callback()
 
-        token = session.fetch_token(
+        return session.fetch_token(
             url=endpoints["token_endpoint"],
             authorization_response=callback_url,
         )
-
-        self._credential_store.save_token(
-            organization_id=self._organization_id,
-            token=token,
-        )
-
-        return token
 
     def _open_browser(self, url: str) -> None:
         """

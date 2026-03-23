@@ -497,20 +497,20 @@ class TestCreateHttpClient:
         with pytest.raises(AuthenticationError, match="No organization ID configured"):
             create_http_client()
 
-    def test_with_organization_id_and_stored_token(
+    def test_with_organization_id_creates_authenticated_client(
         self,
         mocker: MockerFixture,
     ) -> None:
         """
-        Test that create_http_client with an explicit organization_id and a stored
-        token creates an authenticated client.
+        Test that create_http_client with an explicit organization_id creates
+        an authenticated client using the session manager.
         """
         # given
         mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
         mock_create_sm = mocker.patch("cli.http_client.create_session_manager")
         mock_sm = MagicMock()
         mock_session = MagicMock()
-        mock_sm.load_session.return_value = mock_session
+        mock_sm.create_session.return_value = mock_session
         mock_create_sm.return_value = mock_sm
 
         # when
@@ -523,25 +523,7 @@ class TestCreateHttpClient:
             base_url="https://platform.hiverge.ai/api/v1",
             insecure=False,
         )
-        mock_sm.load_session.assert_called_once()
-
-    def test_no_stored_token_raises_authentication_error(
-        self,
-        mocker: MockerFixture,
-    ) -> None:
-        """
-        Test that when no token is stored, an AuthenticationError is raised.
-        """
-        # given
-        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-        mock_create_sm = mocker.patch("cli.http_client.create_session_manager")
-        mock_sm = MagicMock()
-        mock_sm.load_session.return_value = None
-        mock_create_sm.return_value = mock_sm
-
-        # when / then
-        with pytest.raises(AuthenticationError, match="Not logged in"):
-            create_http_client(organization_id="my-org")
+        mock_sm.create_session.assert_called_once()
 
     def test_insecure_flag_is_passed_through(self, mocker: MockerFixture) -> None:
         """

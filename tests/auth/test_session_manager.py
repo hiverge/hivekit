@@ -5,7 +5,6 @@ Tests for the `OidcSessionManager` class and `create_session_manager` factory.
 from unittest.mock import MagicMock
 
 import pytest
-from authlib.integrations.requests_client import OAuth2Session
 from pytest_mock import MockerFixture
 
 from cli.auth.credential_store import CredentialStore
@@ -48,16 +47,18 @@ def _session_manager(
     )
 
 
-class TestOidcSessionManagerLoadSession:
+class TestOidcSessionManagerCreateSession:
     """
-    Tests for the `load_session` method of `OidcSessionManager`.
+    Tests for the `create_session` method of `OidcSessionManager`.
     """
 
-    def test_returns_session_when_token_exists(
-        self, session_manager: OidcSessionManager, mock_credential_store: MagicMock,
+    def test_returns_session_from_stored_token(
+        self, session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
     ) -> None:
         """
-        Test that load_session returns an OAuth2Session when a stored token is available.
+        Test that create_session returns an OAuth2Session from a stored token
+        without initiating the login flow.
         """
         # given
         mock_credential_store.load_token.return_value = {
@@ -66,27 +67,41 @@ class TestOidcSessionManagerLoadSession:
         }
 
         # when
-        session = session_manager.load_session()
+        session = session_manager.create_session()
 
         # then
-        assert isinstance(session, OAuth2Session)
+        assert session.token == {
+            "access_token": "stored-token",
+            "token_type": "Bearer",
+        }
         mock_credential_store.load_token.assert_called_once_with(organization_id="test-org")
+        mock_login_flow.login.assert_not_called()
 
-    def test_returns_none_when_no_token(
-        self, session_manager: OidcSessionManager, mock_credential_store: MagicMock,
+    def test_initiates_login_flow_when_no_stored_token(
+        self, session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
     ) -> None:
         """
-        Test that load_session returns None when no stored token is available.
+        Test that create_session initiates the login flow when no stored token
+        is available.
         """
         # given
         mock_credential_store.load_token.return_value = None
+        mock_login_flow.login.return_value = {
+            "access_token": "fresh-token",
+            "token_type": "Bearer",
+        }
 
         # when
-        result = session_manager.load_session()
+        session = session_manager.create_session()
 
         # then
-        assert result is None
+        assert session.token == {
+            "access_token": "fresh-token",
+            "token_type": "Bearer",
+        }
         mock_credential_store.load_token.assert_called_once_with(organization_id="test-org")
+        mock_login_flow.login.assert_called_once()
 
 
 class TestOidcSessionManagerLogin:
@@ -94,11 +109,13 @@ class TestOidcSessionManagerLogin:
     Tests for the `login` method of `OidcSessionManager`.
     """
 
-    def test_runs_login_flow_and_returns_session(
-        self, session_manager: OidcSessionManager, mock_login_flow: MagicMock,
+    def test_runs_login_flow_and_persists_token(
+        self, session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
     ) -> None:
         """
-        Test that login runs the OIDC login flow and returns an OAuth2Session.
+        Test that login runs the OIDC login flow, persists the token, and
+        returns an OAuth2Session.
         """
         # given
         mock_login_flow.login.return_value = {
@@ -110,8 +127,15 @@ class TestOidcSessionManagerLogin:
         session = session_manager.login()
 
         # then
-        assert isinstance(session, OAuth2Session)
+        assert session.token == {
+            "access_token": "fresh-token",
+            "token_type": "Bearer",
+        }
         mock_login_flow.login.assert_called_once()
+        mock_credential_store.save_token.assert_called_once_with(
+            organization_id="test-org",
+            token={"access_token": "fresh-token", "token_type": "Bearer"},
+        )
 
 
 class TestCreateSessionManager:
@@ -159,7 +183,6 @@ class TestCreateSessionManager:
         mock_login_flow_cls.assert_called_once_with(
             identity_base_url="https://platform.hiverge.ai/identity",
             organization_id="my-org",
-            credential_store=mock_store,
             insecure=True,
         )
         assert manager._token_endpoint == (

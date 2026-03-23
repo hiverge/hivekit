@@ -223,35 +223,25 @@ def create_http_client(
             ID is provided, or if no stored token is available.
     """
     base_url = get_api_endpoint()
-
     if no_auth:
-        return HttpClient(
+        on_auth_failure = _raise_not_configured
+        session = requests.Session(),
+    else:
+        if organization_id is None:
+            raise AuthenticationError(
+                "No organization ID configured. Please run 'hive init' to set up "
+                "your configuration."
+            )
+        session_manager = create_session_manager(
+            organization_id=organization_id,
             base_url=base_url,
-            on_auth_failure=_raise_not_configured,
-            session=requests.Session(),
             insecure=insecure,
         )
-
-    if organization_id is None:
-        raise AuthenticationError(
-            "No organization ID configured. Please run 'hive init' to set up your configuration."
-        )
-
-    session_manager = create_session_manager(
-        organization_id=organization_id,
-        base_url=base_url,
-        insecure=insecure,
-    )
-
-    session = session_manager.load_session()
-    if session is None:
-        raise AuthenticationError(
-            "Not logged in. Please run 'hive login' to authenticate."
-        )
-
+        on_auth_failure = session_manager.login
+        session = session_manager.create_session()
     return HttpClient(
         base_url=base_url,
-        on_auth_failure=session_manager.login,
+        on_auth_failure=on_auth_failure,
         session=session,
         insecure=insecure,
     )

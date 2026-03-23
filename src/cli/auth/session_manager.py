@@ -7,9 +7,8 @@ and re-authenticating when tokens expire.
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict
 
-import requests
 from authlib.integrations.requests_client import OAuth2Session
 
 from cli.auth.auth_utils import get_machine_id
@@ -49,11 +48,10 @@ class OidcSessionManager:
         self._login_flow = login_flow
         self._token_endpoint = token_endpoint
 
-    def load_session(self) -> Optional[OAuth2Session]:
+    def create_session(self) -> OAuth2Session:
         """
-        Load an OAuth2Session from a stored token.
-
-        Returns the session if a stored token is available, or None otherwise.
+        Creates an OAuth2Session from a stored token, or initiates the login flow
+        if no stored token is available.
         """
         token = self._credential_store.load_token(organization_id=self._organization_id)
         if token is None:
@@ -61,10 +59,10 @@ class OidcSessionManager:
                 f"No stored token available for organization '{self._organization_id}'. "
                 f"Login is required."
             )
-            return None
-
-        logger.info(f"Loaded stored token for organization '{self._organization_id}'.")
-        return self._build_session(token=token)
+            return self.login()
+        else:
+            logger.info(f"Loaded stored token for organization '{self._organization_id}'.")
+            return self._build_session(token=token)
 
     def login(self) -> OAuth2Session:
         """
@@ -75,9 +73,12 @@ class OidcSessionManager:
         """
         logger.info(f"Starting OIDC login flow for organization '{self._organization_id}'.")
         token = self._login_flow.login()
+        self._on_token_update(
+            new_token=token,
+        )
         return self._build_session(token=token)
 
-    def _build_session(self, token: dict) -> OAuth2Session:
+    def _build_session(self, token: Dict[str, Any]) -> OAuth2Session:
         """
         Build an OAuth2Session with the given token, configured to persist
         refreshed tokens to the credential store.
@@ -89,7 +90,7 @@ class OidcSessionManager:
             update_token=self._on_token_update,
         )
 
-    def _on_token_update(self, new_token: dict, **kwargs: object) -> None:
+    def _on_token_update(self, new_token: Dict[str, Any], **kwargs: object) -> None:
         """
         Callback invoked by authlib when a token is refreshed.
         """
@@ -126,7 +127,6 @@ def create_session_manager(
     login_flow = OidcLoginFlow(
         identity_base_url=identity_base_url,
         organization_id=organization_id,
-        credential_store=credential_store,
         insecure=insecure,
     )
     endpoints = build_oidc_endpoints(

@@ -3,7 +3,6 @@ import logging
 import os
 import subprocess
 from importlib.metadata import PackageNotFoundError, version
-from typing import Optional
 
 import argcomplete
 from rich.console import Console
@@ -16,7 +15,7 @@ from cli.auth.credential_store import create_credential_store
 from cli.auth.session_manager import create_session_manager
 from cli.completers import config_file_completer, experiment_completer
 from cli.config import load_config
-from cli.http_client import AuthenticationError, HttpClient, create_http_client
+from cli.http_client import HttpClient, create_http_client
 from cli.utils.config_paths import get_config_dir, get_config_path
 from cli.utils.url_utils import get_api_endpoint
 
@@ -26,74 +25,6 @@ try:
     __version__ = version("hivekit")
 except PackageNotFoundError:
     __version__ = "unknown"
-
-
-def _get_http_client(args: argparse.Namespace) -> Optional[HttpClient]:
-    """
-    Build an HttpClient from the parsed command-line arguments.
-
-    Reads the organization ID from the config file when authentication is
-    enabled. Returns None and logs the error if authentication fails.
-    """
-    try:
-        config = load_config(file_path=get_config_path())
-        return create_http_client(
-            organization_id=config.organization_id,
-            no_auth=getattr(args, "no_auth", False),
-            insecure=getattr(args, "insecure", False),
-        )
-    except AuthenticationError as e:
-        logger.error(f"Authentication error: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Failed to load configuration: {e}")
-        return None
-
-
-def _load_organization_id_or_print_error(console: Console) -> Optional[str]:
-    """
-    Load the organization ID from the config file, printing an error if it
-    cannot be found.
-
-    Returns the organization ID, or None if the config file is missing or
-    does not contain an organization_id.
-    """
-    config_path = get_config_path()
-    if not os.path.exists(config_path):
-        console.print(
-            "[bold red]Error:[/bold red] No configuration found. "
-            "Please run 'hive init' first."
-        )
-        return None
-
-    config = load_config(file_path=config_path)
-
-    if not config.organization_id:
-        console.print(
-            "[bold red]Error:[/bold red] No organization_id found in config. "
-            "Please run 'hive init' to set it."
-        )
-        return None
-
-    return config.organization_id
-
-
-def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
-    """
-    Run the OIDC login flow for the given organization.
-    """
-    session_manager = create_session_manager(
-        organization_id=organization_id,
-        base_url=get_api_endpoint(),
-        insecure=insecure,
-    )
-
-    console.print("[yellow]Opening browser for login...[/yellow]")
-    try:
-        session_manager.login()
-        console.print("[bold green]✓ Login successful![/bold green]")
-    except Exception as e:
-        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
 
 
 def init(args) -> None:
@@ -219,12 +150,12 @@ def login(args) -> None:
     """Log in to the Hive platform via OIDC."""
     console = Console()
 
-    organization_id = _load_organization_id_or_print_error(console)
-    if organization_id is None:
-        return
-
-    insecure = getattr(args, "insecure", False)
-    _run_login(console=console, organization_id=organization_id, insecure=insecure)
+    try:
+        organization_id = _load_organization_id()
+        insecure = getattr(args, "insecure", False)
+        _run_login(console=console, organization_id=organization_id, insecure=insecure)
+    except Exception as e:
+        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
 
 
 def logout(args) -> None:
@@ -233,23 +164,19 @@ def logout(args) -> None:
     """
     console = Console()
 
-    organization_id = _load_organization_id_or_print_error(console)
-    if organization_id is None:
-        return
-
-    credential_store = create_credential_store(
-        clients_dir=os.path.join(get_config_dir(), "clients"),
-        machine_id_func=get_machine_id,
-    )
-
     try:
+        organization_id = _load_organization_id()
+        credential_store = create_credential_store(
+            clients_dir=os.path.join(get_config_dir(), "clients"),
+            machine_id_func=get_machine_id,
+        )
         credential_store.delete_token(organization_id=organization_id)
         console.print(
             f"[bold green]✓ Cleared credentials for organization "
             f"'{organization_id}'.[/bold green]"
         )
-    except Exception:
-        console.print("[yellow]No stored credentials found.[/yellow]")
+    except Exception as e:
+        console.print(f"[bold red]✗ Logout failed:[/bold red] {e}")
 
 
 def edit_cli(args):
@@ -289,13 +216,10 @@ def create_experiment(args) -> None:
         console.print(f"[bold red]Error building experiment CRD:[/bold red] {e}")
         return
 
-    client = _get_http_client(args)
-    if client is None:
-        return
-
     # Send request to create experiment
     console.print("\n[yellow]Sending request to backend server...[/yellow]")
     try:
+        client = _get_http_client(args)
         result = client.create_experiment(experiment_crd)
         console.print("\n[bold green]✓ Experiment created successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
@@ -323,10 +247,6 @@ def delete_experiment(args) -> None:
 
     console.print(f"\n[bold yellow]Deleting experiment:[/bold yellow] {experiment_name}")
 
-    client = _get_http_client(args)
-    if client is None:
-        return
-
     # Confirm deletion unless -y flag is set
     if not args.yes:
         response = (
@@ -341,6 +261,7 @@ def delete_experiment(args) -> None:
     # Send request to delete experiment
     console.print("\n[yellow]Sending delete request to backend server...[/yellow]")
     try:
+        client = _get_http_client(args)
         _ = client.delete_experiment(experiment_name)
         console.print("\n[bold green]✓ Experiment deleted successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
@@ -360,12 +281,8 @@ def list_experiments(args) -> None:
 
     console.print("\n[bold cyan]Listing experiments...[/bold cyan]")
 
-    client = _get_http_client(args)
-    if client is None:
-        return
-
-    # Send request to list experiments
     try:
+        client = _get_http_client(args)
         result = client.list_experiments()
         experiments = result.get("experiments", [])
 
@@ -412,12 +329,8 @@ def get_experiment(args) -> None:
 
     console.print(f"\n[bold cyan]Getting experiment:[/bold cyan] {experiment_name}")
 
-    client = _get_http_client(args)
-    if client is None:
-        return
-
-    # Send request to get experiment
     try:
+        client = _get_http_client(args)
         exp = client.get_experiment(experiment_name)
 
         metadata = exp.get("metadata", {})
@@ -470,6 +383,61 @@ def get_experiment(args) -> None:
         console.print("  • Check that the backend server is running")
         console.print(f"  • Verify the experiment '{experiment_name}' exists")
         return
+
+
+def _get_http_client(args: argparse.Namespace) -> HttpClient:
+    """
+    Build an HttpClient from the parsed command-line arguments.
+
+    Reads the organization ID from the config file when authentication is
+    enabled.
+    """
+    return create_http_client(
+        organization_id=_load_organization_id(),
+        no_auth=getattr(args, "no_auth", False),
+        insecure=getattr(args, "insecure", False),
+    )
+
+
+def _load_organization_id() -> str:
+    """
+    Load the organization ID from the config file.
+
+    Raises:
+        FileNotFoundError: If the config file does not exist.
+        ValueError: If the config file does not contain an organization ID.
+    """
+    config_path = get_config_path()
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            "No configuration found. Please run 'hive init' first."
+        )
+
+    config = load_config(file_path=config_path)
+
+    if not config.organization_id:
+        raise ValueError(
+            "No organization_id found in config. Please run 'hive init' to set it."
+        )
+
+    return config.organization_id
+
+
+def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
+    """
+    Run the OIDC login flow for the given organization.
+    """
+    session_manager = create_session_manager(
+        organization_id=organization_id,
+        base_url=get_api_endpoint(),
+        insecure=insecure,
+    )
+    console.print("[yellow]Opening browser for login...[/yellow]")
+    try:
+        session_manager.login()
+        console.print("[bold green]✓ Login successful![/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
 
 
 def main():
