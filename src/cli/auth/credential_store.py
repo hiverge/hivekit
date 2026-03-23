@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 import keyring
 from cryptography.fernet import Fernet
@@ -42,13 +42,13 @@ class TokenEncryptor:
         key = base64.urlsafe_b64encode(hashlib.sha256(machine_id.encode()).digest())
         self._fernet = Fernet(key)
 
-    def encrypt(self, token: dict) -> str:
+    def encrypt(self, token: Dict[str, Any]) -> str:
         """
         Serialize and encrypt a token dict, returning a UTF-8 string.
         """
         return self._fernet.encrypt(json.dumps(token).encode()).decode()
 
-    def decrypt(self, data: str) -> dict:
+    def decrypt(self, data: str) -> Dict[str, Any]:
         """
         Decrypt and deserialize an encrypted token string back to a dict.
         """
@@ -61,13 +61,13 @@ class CredentialStore(ABC):
     """
 
     @abstractmethod
-    def save_token(self, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: Dict[str, Any]) -> None:
         """
         Persist an OAuth token for the given organization.
         """
 
     @abstractmethod
-    def load_token(self, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[Dict[str, Any]]:
         """
         Load a previously stored OAuth token for the given organization.
 
@@ -98,14 +98,14 @@ class KeyringCredentialStore(CredentialStore):
         self._keyring = keyring_backend
         self._encryptor = encryptor
 
-    def save_token(self, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: Dict[str, Any]) -> None:
         """
         Encrypt and save an OAuth token to the system keyring.
         """
         encrypted = self._encryptor.encrypt(token=token)
         self._keyring.set_password(_KEYRING_SERVICE, organization_id, encrypted)
 
-    def load_token(self, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[Dict[str, Any]]:
         """
         Load and decrypt an OAuth token from the system keyring.
         """
@@ -145,7 +145,7 @@ class FileCredentialStore(CredentialStore):
         self._clients_dir = clients_dir
         self._encryptor = encryptor
 
-    def save_token(self, organization_id: str, token: dict) -> None:
+    def save_token(self, organization_id: str, token: Dict[str, Any]) -> None:
         """
         Encrypt and save an OAuth token to a file.
         """
@@ -155,7 +155,7 @@ class FileCredentialStore(CredentialStore):
         with open(path, "w") as f:
             f.write(encrypted)
 
-    def load_token(self, organization_id: str) -> Optional[dict]:
+    def load_token(self, organization_id: str) -> Optional[Dict[str, Any]]:
         """
         Load and decrypt an OAuth token from a file.
         """
