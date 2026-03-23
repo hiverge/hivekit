@@ -7,13 +7,14 @@ import os
 from typing import Any, Callable, Dict, Optional
 
 import requests
-import yaml
 from authlib.integrations.requests_client import OAuth2Session
 from rich.console import Console
 
 from cli.auth.auth_utils import get_machine_id
 from cli.auth.credential_store import CredentialStore, create_credential_store
 from cli.auth.oidc_flow import OidcLoginFlow
+from cli.config import load_organization_id
+from cli.utils.config_paths import get_config_dir, get_config_path
 from cli.utils.url_utils import build_oidc_endpoints, derive_identity_base_url, get_api_endpoint
 
 console = Console()
@@ -228,7 +229,7 @@ class HttpClient:
         return response
 
 
-def create_unauthenticated_http_client(
+def _create_unauthenticated_http_client(
     base_url: str, insecure: bool = False
 ) -> HttpClient:
     """
@@ -252,7 +253,7 @@ def create_unauthenticated_http_client(
     )
 
 
-def create_http_client(
+def _create_http_client(
     base_url: str,
     insecure: bool,
     organization_id: str,
@@ -326,39 +327,47 @@ def create_http_client(
 
 
 def build_http_client(
-    no_auth: bool,
-    insecure: bool,
-    config_dir: str,
-    config_path: str,
+    organization_id: Optional[str] = None,
+    no_auth: bool = False,
+    insecure: bool = False,
 ) -> HttpClient:
     """
     Build an HttpClient from configuration, setting up authentication if needed.
 
-    Reads the organization ID from the config file and creates the appropriate
-    credential store and OIDC login flow.
+    When authentication is enabled (no_auth=False), the organization_id is required.
+    If it is not provided, the function reads it from the config file. If no
+    organization ID can be determined, an AuthenticationError is raised.
 
     Args:
-        no_auth: If True, skip authentication entirely.
-        insecure: If True, disable SSL certificate verification.
-        config_dir: The directory containing the Hive configuration.
-        config_path: The path to the Hive configuration file.
+        organization_id: The organization ID for authentication. Required when
+            no_auth is False, unless it can be read from the config file.
+        no_auth: If True, skip authentication entirely. Defaults to False.
+        insecure: If True, disable SSL certificate verification. Defaults to False.
+
+    Returns:
+        A configured HttpClient instance.
+
+    Raises:
+        AuthenticationError: If no organization ID can be determined when
+            authentication is enabled.
     """
     base_url = get_api_endpoint()
 
     if no_auth:
-        return create_unauthenticated_http_client(base_url, insecure=insecure)
+        return _create_unauthenticated_http_client(base_url=base_url, insecure=insecure)
 
-    organization_id = None
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            raw_config = yaml.safe_load(f) or {}
-        organization_id = raw_config.get("organization_id")
+    # Resolve organization_id from config if not provided
+    if organization_id is None:
+        if os.path.exists(get_config_path()):
+            organization_id = load_organization_id(file_path=get_config_path())
 
     if organization_id is None:
-        return create_unauthenticated_http_client(base_url, insecure=insecure)
+        raise AuthenticationError(
+            "No organization ID configured. Please run 'hive init' to set up your configuration."
+        )
 
     credential_store = create_credential_store(
-        clients_dir=os.path.join(config_dir, "clients"),
+        clients_dir=os.path.join(get_config_dir(), "clients"),
         machine_id_func=get_machine_id,
     )
     identity_base_url = derive_identity_base_url(api_endpoint=base_url)
@@ -369,7 +378,7 @@ def build_http_client(
         insecure=insecure,
     )
 
-    return create_http_client(
+    return _create_http_client(
         base_url=base_url,
         insecure=insecure,
         organization_id=organization_id,

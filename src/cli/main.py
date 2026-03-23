@@ -3,9 +3,9 @@ import logging
 import os
 import subprocess
 from importlib.metadata import PackageNotFoundError, version
+from typing import Optional
 
 import argcomplete
-import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -15,8 +15,9 @@ from cli.auth.auth_utils import get_machine_id
 from cli.auth.credential_store import create_credential_store
 from cli.auth.oidc_flow import OidcLoginFlow
 from cli.completers import config_file_completer, experiment_completer
-from cli.config import load_config
-from cli.http_client import AuthenticationError, build_http_client
+from cli.config import load_config, load_organization_id
+from cli.http_client import AuthenticationError, HttpClient, build_http_client
+from cli.utils.config_paths import get_config_dir, get_config_path
 from cli.utils.url_utils import derive_identity_base_url, get_api_endpoint
 
 logger = logging.getLogger("hivekit")
@@ -26,8 +27,41 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown"
 
-_CONFIG_DIR = os.path.expandvars("$HOME/.hive")
-_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.yaml")
+
+def _get_http_client(args: argparse.Namespace) -> HttpClient:
+    """
+    Build an HttpClient from the parsed command-line arguments.
+    """
+    return build_http_client(
+        no_auth=getattr(args, "no_auth", False),
+        insecure=getattr(args, "insecure", False),
+    )
+
+
+def _load_organization_id_or_error(console: Console) -> Optional[str]:
+    """
+    Load the organization ID from the config file, printing an error if it
+    cannot be found.
+
+    Returns the organization ID, or None if the config file is missing or
+    does not contain an organization_id.
+    """
+    if not os.path.exists(get_config_path()):
+        console.print(
+            "[bold red]Error:[/bold red] No configuration found. "
+            "Please run 'hive init' first."
+        )
+        return None
+
+    organization_id = load_organization_id(file_path=get_config_path())
+    if not organization_id:
+        console.print(
+            "[bold red]Error:[/bold red] No organization_id found in config. "
+            "Please run 'hive init' to set it."
+        )
+        return None
+
+    return organization_id
 
 
 def init(args) -> None:
@@ -52,8 +86,8 @@ def init(args) -> None:
     print(f"{BLUE}{ascii_art}{RESET}")
 
     # Default config path
-    config_dir = _CONFIG_DIR
-    config_path = _CONFIG_PATH
+    config_dir = get_config_dir()
+    config_path = get_config_path()
 
     # Check if config already exists
     if os.path.exists(config_path):
@@ -137,7 +171,7 @@ provider:
 
     # Log in if no existing credentials for this organization
     credential_store = create_credential_store(
-        clients_dir=os.path.join(_CONFIG_DIR, "clients"),
+        clients_dir=os.path.join(get_config_dir(), "clients"),
         machine_id_func=get_machine_id,
     )
     existing_token = credential_store.load_token(organization_id=organization_id)
@@ -155,7 +189,7 @@ def _run_login(console: Console, organization_id: str, insecure: bool = False) -
     base_url = get_api_endpoint()
     identity_base_url = derive_identity_base_url(api_endpoint=base_url)
     credential_store = create_credential_store(
-        clients_dir=os.path.join(_CONFIG_DIR, "clients"),
+        clients_dir=os.path.join(get_config_dir(), "clients"),
         machine_id_func=get_machine_id,
     )
     flow = OidcLoginFlow(
@@ -178,22 +212,8 @@ def login(args) -> None:
     console = Console()
 
     # Load organization ID from config
-    if not os.path.exists(_CONFIG_PATH):
-        console.print(
-            "[bold red]Error:[/bold red] No configuration found. "
-            "Please run 'hive init' first."
-        )
-        return
-
-    with open(_CONFIG_PATH, "r") as f:
-        raw_config = yaml.safe_load(f) or {}
-
-    organization_id = raw_config.get("organization_id")
-    if not organization_id:
-        console.print(
-            "[bold red]Error:[/bold red] No organization_id found in config. "
-            "Please run 'hive init' to set it."
-        )
+    organization_id = _load_organization_id_or_error(console)
+    if organization_id is None:
         return
 
     insecure = getattr(args, "insecure", False)
@@ -201,46 +221,28 @@ def login(args) -> None:
 
 
 def logout(args) -> None:
-    """Log out by clearing all stored credentials."""
+    """
+    Log out by clearing stored credentials for the currently configured organization.
+    """
     console = Console()
 
-    clients_dir = os.path.join(_CONFIG_DIR, "clients")
+    organization_id = _load_organization_id_or_error(console)
+    if organization_id is None:
+        return
+
     credential_store = create_credential_store(
-        clients_dir=clients_dir,
+        clients_dir=os.path.join(get_config_dir(), "clients"),
         machine_id_func=get_machine_id,
     )
 
-    # Load organization ID from config if available
-    organization_ids = []
-    if os.path.exists(_CONFIG_PATH):
-        with open(_CONFIG_PATH, "r") as f:
-            raw_config = yaml.safe_load(f) or {}
-        org_id = raw_config.get("organization_id")
-        if org_id:
-            organization_ids.append(org_id)
-
-    # Also clear any file-based credentials by scanning the clients directory
-    if os.path.isdir(clients_dir):
-        for filename in os.listdir(clients_dir):
-            if filename.endswith("_client"):
-                org_id = filename[: -len("_client")]
-                if org_id not in organization_ids:
-                    organization_ids.append(org_id)
-
-    if not organization_ids:
+    try:
+        credential_store.delete_token(organization_id=organization_id)
+        console.print(
+            f"[bold green]✓ Cleared credentials for organization "
+            f"'{organization_id}'.[/bold green]"
+        )
+    except Exception:
         console.print("[yellow]No stored credentials found.[/yellow]")
-        return
-
-    for org_id in organization_ids:
-        try:
-            credential_store.delete_token(organization_id=org_id)
-        except Exception:
-            pass
-
-    console.print(
-        f"[bold green]✓ Cleared credentials for {len(organization_ids)} "
-        f"organization(s).[/bold green]"
-    )
 
 
 def edit_cli(args):
@@ -282,12 +284,7 @@ def create_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = build_http_client(
-            no_auth=getattr(args, "no_auth", False),
-            insecure=getattr(args, "insecure", False),
-            config_dir=_CONFIG_DIR,
-            config_path=_CONFIG_PATH,
-        )
+        client = _get_http_client(args)
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -327,12 +324,7 @@ def delete_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = build_http_client(
-            no_auth=getattr(args, "no_auth", False),
-            insecure=getattr(args, "insecure", False),
-            config_dir=_CONFIG_DIR,
-            config_path=_CONFIG_PATH,
-        )
+        client = _get_http_client(args)
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -374,12 +366,7 @@ def list_experiments(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = build_http_client(
-            no_auth=getattr(args, "no_auth", False),
-            insecure=getattr(args, "insecure", False),
-            config_dir=_CONFIG_DIR,
-            config_path=_CONFIG_PATH,
-        )
+        client = _get_http_client(args)
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return
@@ -436,12 +423,7 @@ def get_experiment(args) -> None:
 
     # Initialize HTTP client
     try:
-        client = build_http_client(
-            no_auth=getattr(args, "no_auth", False),
-            insecure=getattr(args, "insecure", False),
-            config_dir=_CONFIG_DIR,
-            config_path=_CONFIG_PATH,
-        )
+        client = _get_http_client(args)
     except AuthenticationError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return

@@ -1,5 +1,5 @@
 """
-Unit tests for the HttpClient class and create_http_client factory.
+Unit tests for the HttpClient class and the build_http_client factory.
 """
 
 import os
@@ -8,13 +8,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from cli.auth.credential_store import CredentialStore
-from cli.auth.oidc_flow import OidcLoginFlow
 from cli.http_client import (
     AuthenticationError,
     HttpClient,
-    create_http_client,
-    create_unauthenticated_http_client,
+    build_http_client,
 )
 
 
@@ -24,6 +21,26 @@ def _mock_on_auth_failure() -> MagicMock:
     A mock on_auth_failure callback.
     """
     return MagicMock()
+
+
+@pytest.fixture(name="mock_session")
+def _mock_session() -> MagicMock:
+    """
+    A mock HTTP session.
+    """
+    return MagicMock(spec=requests.Session)
+
+
+@pytest.fixture(name="http_client")
+def _http_client(mock_on_auth_failure: MagicMock, mock_session: MagicMock) -> HttpClient:
+    """
+    An HttpClient configured with a mock session and mock auth callback.
+    """
+    return HttpClient(
+        on_auth_failure=mock_on_auth_failure,
+        session=mock_session,
+        base_url="https://example.com/api/v1",
+    )
 
 
 class TestHttpClientInit:
@@ -154,24 +171,18 @@ class TestHttpClientCreateExperiment:
     Tests for the `create_experiment` method.
     """
 
-    def test_create_experiment_success(self) -> None:
+    def test_create_experiment_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test successful experiment creation.
         """
         # given
-        mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"metadata": {"name": "test-exp"}}
         mock_session.post.return_value = mock_response
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when
-        result = client.create_experiment({"metadata": {"name": "test-exp"}})
+        result = http_client.create_experiment({"metadata": {"name": "test-exp"}})
 
         # then
         assert result == {"metadata": {"name": "test-exp"}}
@@ -183,12 +194,11 @@ class TestHttpClientCreateExperiment:
             verify=True,
         )
 
-    def test_create_experiment_http_error_with_json(self) -> None:
+    def test_create_experiment_http_error_with_json(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that create_experiment handles an HTTP error with a JSON response.
         """
         # given
-        mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 400
         mock_response.json.return_value = {"error": "Bad request"}
@@ -196,32 +206,21 @@ class TestHttpClientCreateExperiment:
         http_error.response = mock_response
         mock_response.raise_for_status.side_effect = http_error
         mock_session.post.return_value = mock_response
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when / then
         with pytest.raises(Exception, match="Failed to create experiment: Bad request"):
-            client.create_experiment({"metadata": {"name": "test"}})
+            http_client.create_experiment({"metadata": {"name": "test"}})
 
-    def test_create_experiment_connection_error(self) -> None:
+    def test_create_experiment_connection_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that create_experiment handles connection errors.
         """
         # given
-        mock_session = MagicMock()
         mock_session.post.side_effect = requests.exceptions.ConnectionError("Connection failed")
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when / then
         with pytest.raises(Exception, match="Failed to connect to backend server"):
-            client.create_experiment({"metadata": {"name": "test"}})
+            http_client.create_experiment({"metadata": {"name": "test"}})
 
 
 class TestHttpClientGetExperiment:
@@ -229,24 +228,18 @@ class TestHttpClientGetExperiment:
     Tests for the `get_experiment` method.
     """
 
-    def test_get_experiment_success(self) -> None:
+    def test_get_experiment_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test successful get experiment.
         """
         # given
-        mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"metadata": {"name": "test-exp"}}
         mock_session.get.return_value = mock_response
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when
-        result = client.get_experiment("test-exp")
+        result = http_client.get_experiment("test-exp")
 
         # then
         assert result == {"metadata": {"name": "test-exp"}}
@@ -258,22 +251,16 @@ class TestHttpClientGetExperiment:
             verify=True,
         )
 
-    def test_get_experiment_error(self) -> None:
+    def test_get_experiment_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that get_experiment handles errors.
         """
         # given
-        mock_session = MagicMock()
         mock_session.get.side_effect = requests.exceptions.RequestException("Error")
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when / then
         with pytest.raises(Exception, match="Failed to get experiment"):
-            client.get_experiment("test-exp")
+            http_client.get_experiment("test-exp")
 
 
 class TestHttpClientListExperiments:
@@ -281,49 +268,43 @@ class TestHttpClientListExperiments:
     Tests for the `list_experiments` method.
     """
 
-    def test_list_experiments_success(self) -> None:
+    def test_list_experiments_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test successful list experiments.
         """
         # given
-        mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "experiments": [{"metadata": {"name": "exp1"}}, {"metadata": {"name": "exp2"}}]
         }
         mock_session.get.return_value = mock_response
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when
-        result = client.list_experiments()
+        result = http_client.list_experiments()
 
         # then
         assert result == {
             "experiments": [{"metadata": {"name": "exp1"}}, {"metadata": {"name": "exp2"}}]
         }
-        mock_session.get.assert_called_once()
+        mock_session.get.assert_called_once_with(
+            "https://example.com/api/v1/experiments",
+            headers={"Content-Type": "application/json"},
+            json=None,
+            timeout=30,
+            verify=True,
+        )
 
-    def test_list_experiments_error(self) -> None:
+    def test_list_experiments_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that list_experiments handles errors.
         """
         # given
-        mock_session = MagicMock()
         mock_session.get.side_effect = requests.exceptions.RequestException("Error")
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when / then
         with pytest.raises(Exception, match="Failed to list experiments"):
-            client.list_experiments()
+            http_client.list_experiments()
 
 
 class TestHttpClientDeleteExperiment:
@@ -331,45 +312,39 @@ class TestHttpClientDeleteExperiment:
     Tests for the `delete_experiment` method.
     """
 
-    def test_delete_experiment_success(self) -> None:
+    def test_delete_experiment_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test successful delete experiment.
         """
         # given
-        mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"message": "Deleted"}
         mock_session.delete.return_value = mock_response
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when
-        result = client.delete_experiment("test-exp")
+        result = http_client.delete_experiment("test-exp")
 
         # then
         assert result == {"message": "Deleted"}
-        mock_session.delete.assert_called_once()
+        mock_session.delete.assert_called_once_with(
+            "https://example.com/api/v1/experiments/test-exp",
+            headers={"Content-Type": "application/json"},
+            json=None,
+            timeout=30,
+            verify=True,
+        )
 
-    def test_delete_experiment_error(self) -> None:
+    def test_delete_experiment_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that delete_experiment handles errors.
         """
         # given
-        mock_session = MagicMock()
         mock_session.delete.side_effect = requests.exceptions.RequestException("Error")
-        client = HttpClient(
-            on_auth_failure=MagicMock(),
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
 
         # when / then
         with pytest.raises(Exception, match="Failed to delete experiment"):
-            client.delete_experiment("test-exp")
+            http_client.delete_experiment("test-exp")
 
 
 class TestAuthenticationHandling:
@@ -524,97 +499,168 @@ class TestAuthenticationHandling:
         )
 
 
-class TestCreateHttpClient:
+class TestBuildHttpClient:
     """
-    Tests for the `create_http_client` and `create_unauthenticated_http_client` factory functions.
+    Tests for the `build_http_client` factory function.
     """
 
-    def test_unauthenticated_returns_plain_client(self) -> None:
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    def test_no_auth_returns_unauthenticated_client(self, mock_get_endpoint: MagicMock) -> None:
         """
-        Test that create_unauthenticated_http_client returns an HttpClient with a plain session.
+        Test that build_http_client with no_auth=True returns an unauthenticated client.
         """
         # when
-        client = create_unauthenticated_http_client(
-            base_url="https://example.com/api/v1",
-        )
+        client = build_http_client(no_auth=True)
 
         # then
-        assert client.base_url == "https://example.com/api/v1"
-        assert client._on_auth_failure is not None
+        assert client.base_url == "https://platform.hiverge.ai/api/v1"
+        mock_get_endpoint.assert_called_once()
+        # The on_auth_failure callback should raise AuthenticationError
+        with pytest.raises(AuthenticationError, match="Authentication is not configured"):
+            client._on_auth_failure()
+
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    @patch("cli.http_client.os.path.exists", return_value=False)
+    def test_no_config_file_raises_authentication_error(
+        self, mock_exists: MagicMock, mock_get_endpoint: MagicMock
+    ) -> None:
+        """
+        Test that build_http_client raises AuthenticationError when no config
+        file exists and no organization_id is provided.
+        """
+        # when / then
+        with pytest.raises(AuthenticationError, match="No organization ID configured"):
+            build_http_client()
 
     @patch("cli.http_client.OidcLoginFlow")
-    def test_with_stored_token(self, mock_flow_class: MagicMock) -> None:
+    @patch("cli.http_client.create_credential_store")
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    def test_with_organization_id_and_stored_token(
+        self,
+        mock_get_endpoint: MagicMock,
+        mock_create_store: MagicMock,
+        mock_flow_class: MagicMock,
+    ) -> None:
         """
-        Test that a stored token is loaded and used to create an OAuth2Session.
+        Test that build_http_client with an explicit organization_id and a stored
+        token creates an authenticated client.
         """
         # given
-        mock_credential_store = MagicMock(spec=CredentialStore)
-        mock_credential_store.load_token.return_value = {
+        mock_store = MagicMock()
+        mock_store.load_token.return_value = {
             "access_token": "stored-token",
             "token_type": "Bearer",
         }
-        mock_login_flow = MagicMock(spec=OidcLoginFlow)
+        mock_create_store.return_value = mock_store
 
         # when
-        client = create_http_client(
-            base_url="https://platform.hiverge.ai/api/v1",
-            insecure=False,
-            organization_id="my-org",
-            credential_store=mock_credential_store,
-            login_flow=mock_login_flow,
-        )
+        client = build_http_client(organization_id="my-org")
 
         # then
-        mock_credential_store.load_token.assert_called_once_with(organization_id="my-org")
         assert client.base_url == "https://platform.hiverge.ai/api/v1"
+        mock_store.load_token.assert_called_once_with(organization_id="my-org")
 
     @patch("cli.http_client.OidcLoginFlow")
-    def test_no_stored_token_triggers_auto_login(self, mock_flow_class: MagicMock) -> None:
+    @patch("cli.http_client.create_credential_store")
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    def test_no_stored_token_triggers_auto_login(
+        self,
+        mock_get_endpoint: MagicMock,
+        mock_create_store: MagicMock,
+        mock_flow_class: MagicMock,
+    ) -> None:
         """
         Test that when no token is stored, auto-login is attempted via the login flow.
         """
         # given
-        mock_credential_store = MagicMock(spec=CredentialStore)
-        mock_credential_store.load_token.return_value = None
-        mock_login_flow = MagicMock(spec=OidcLoginFlow)
-        mock_login_flow.login.return_value = {
+        mock_store = MagicMock()
+        mock_store.load_token.return_value = None
+        mock_create_store.return_value = mock_store
+
+        mock_flow = MagicMock()
+        mock_flow.login.return_value = {
             "access_token": "fresh-token",
             "token_type": "Bearer",
         }
+        mock_flow_class.return_value = mock_flow
 
         # when
-        client = create_http_client(
-            base_url="https://platform.hiverge.ai/api/v1",
-            insecure=False,
-            organization_id="my-org",
-            credential_store=mock_credential_store,
-            login_flow=mock_login_flow,
-        )
+        client = build_http_client(organization_id="my-org")
 
         # then
-        mock_login_flow.login.assert_called_once()
-        assert client._on_auth_failure is not None
+        mock_flow.login.assert_called_once()
+        assert client.base_url == "https://platform.hiverge.ai/api/v1"
 
     @patch("cli.http_client.OidcLoginFlow")
+    @patch("cli.http_client.create_credential_store")
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
     def test_no_stored_token_login_failure_raises_authentication_error(
-        self, mock_flow_class: MagicMock
+        self,
+        mock_get_endpoint: MagicMock,
+        mock_create_store: MagicMock,
+        mock_flow_class: MagicMock,
     ) -> None:
         """
         Test that when no token is stored and auto-login fails, an
         AuthenticationError is raised.
         """
         # given
-        mock_credential_store = MagicMock(spec=CredentialStore)
-        mock_credential_store.load_token.return_value = None
-        mock_login_flow = MagicMock(spec=OidcLoginFlow)
-        mock_login_flow.login.side_effect = Exception("Browser failed")
+        mock_store = MagicMock()
+        mock_store.load_token.return_value = None
+        mock_create_store.return_value = mock_store
+
+        mock_flow = MagicMock()
+        mock_flow.login.side_effect = Exception("Browser failed")
+        mock_flow_class.return_value = mock_flow
 
         # when / then
         with pytest.raises(AuthenticationError, match="Login failed"):
-            create_http_client(
-                base_url="https://platform.hiverge.ai/api/v1",
-                insecure=False,
-                organization_id="my-org",
-                credential_store=mock_credential_store,
-                login_flow=mock_login_flow,
-            )
+            build_http_client(organization_id="my-org")
+
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    def test_insecure_flag_is_passed_through(self, mock_get_endpoint: MagicMock) -> None:
+        """
+        Test that the insecure flag is passed through to the unauthenticated client.
+        """
+        # when
+        client = build_http_client(no_auth=True, insecure=True)
+
+        # then
+        assert client._insecure is True
+
+    @patch("cli.http_client.OidcLoginFlow")
+    @patch("cli.http_client.create_credential_store")
+    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+    @patch("builtins.open", create=True)
+    @patch("cli.http_client.os.path.exists", return_value=True)
+    def test_reads_organization_id_from_config_file(
+        self,
+        mock_exists: MagicMock,
+        mock_open: MagicMock,
+        mock_get_endpoint: MagicMock,
+        mock_create_store: MagicMock,
+        mock_flow_class: MagicMock,
+    ) -> None:
+        """
+        Test that build_http_client reads the organization_id from the config file
+        when not provided explicitly.
+        """
+        # given
+        import io
+
+        mock_open.return_value.__enter__ = lambda s: io.StringIO("organization_id: file-org\n")
+        mock_open.return_value.__exit__ = MagicMock(return_value=False)
+
+        mock_store = MagicMock()
+        mock_store.load_token.return_value = {
+            "access_token": "token",
+            "token_type": "Bearer",
+        }
+        mock_create_store.return_value = mock_store
+
+        # when
+        client = build_http_client()
+
+        # then
+        mock_store.load_token.assert_called_once_with(organization_id="file-org")
+        assert client.base_url == "https://platform.hiverge.ai/api/v1"

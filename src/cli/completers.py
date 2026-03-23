@@ -1,11 +1,6 @@
-import os
-
 from argcomplete.completers import FilesCompleter
 
 from cli.http_client import build_http_client
-
-_CONFIG_DIR = os.path.expandvars("$HOME/.hive")
-_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.yaml")
 
 
 def config_file_completer(prefix, **kwargs):
@@ -20,12 +15,7 @@ def config_file_completer(prefix, **kwargs):
 def experiment_completer(prefix, **kwargs):
     """Autocomplete for experiment names by fetching from the server."""
     try:
-        client = build_http_client(
-            no_auth=False,
-            insecure=False,
-            config_dir=_CONFIG_DIR,
-            config_path=_CONFIG_PATH,
-        )
+        client = build_http_client()
 
         # Fetch experiments from server
         result = client.list_experiments()

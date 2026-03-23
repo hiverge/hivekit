@@ -23,12 +23,12 @@ logger = logging.getLogger("hivekit")
 
 class TokenEncryptor:
     """
-    Encrypts and decrypts token payloads using Fernet with a key derived
-    from the machine ID.
+    Encrypts and decrypts token payloads using Fernet with a key derived from the machine ID.
 
-    Note: this is not a strong security control since the machine ID is
-    obtainable by any process on the same host, but it prevents casual
-    inspection of stored credentials.
+    **Note**: this is not a strong security control since the machine ID is obtainable by any
+    process on the same host, but it prevents casual inspection of stored credentials. It also
+    *possibly* helps with certain scenarios, like a user syncing their files to an insecure
+    location.
     """
 
     def __init__(self, machine_id: str) -> None:

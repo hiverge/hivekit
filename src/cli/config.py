@@ -183,6 +183,17 @@ class HiveConfig(BaseModel):
     )
 
 
+def load_organization_id(file_path: str) -> Optional[str]:
+    """
+    Load only the organization ID from a YAML configuration file.
+
+    Returns None if the file does not contain an organization_id field.
+    """
+    with open(file_path, "r") as f:
+        raw = yaml.safe_load(f) or {}
+    return raw.get("organization_id")
+
+
 def load_config(file_path: str) -> HiveConfig:
     """Load configuration from a YAML file."""
     with open(file_path, "r") as file:
