@@ -12,7 +12,7 @@ def _load_logo_svg() -> str:
     """
     Load the Hiverge logo SVG from the package data.
     """
-    return files("cli.auth").joinpath("logo.svg").read_text(encoding="utf-8")
+    return files(__package__).joinpath("logo.svg").read_text(encoding="utf-8")
 
 
 _LOGO_SVG = _load_logo_svg()

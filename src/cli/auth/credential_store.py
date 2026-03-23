@@ -1,8 +1,7 @@
 """
 Credential storage for OIDC tokens, with keyring and file-based backends.
 
-Both backends encrypt tokens using a Fernet key derived from the machine ID
-before persisting them. The `create_credential_store` factory function should
+The `create_credential_store` factory function should
 be used to obtain a store instance: it probes the system keyring and falls
 back to file-based storage if the keyring is unavailable.
 """
@@ -18,7 +17,9 @@ from typing import Any, Callable, Optional
 import keyring
 from cryptography.fernet import Fernet
 
-logger = logging.getLogger("hivekit")
+_KEYRING_SERVICE = "hivekit"
+
+logger = logging.getLogger(_KEYRING_SERVICE)
 
 
 class TokenEncryptor:
@@ -83,9 +84,6 @@ class CredentialStore(ABC):
 class KeyringCredentialStore(CredentialStore):
     """
     Credential store backed by the system keyring (e.g. macOS Keychain).
-
-    Tokens are encrypted with Fernet before being written to disk (although the encryption
-    key is the machine ID, so this is not a strong control).
     """
 
     def __init__(self, keyring_backend: Any, encryptor: TokenEncryptor) -> None:
@@ -105,13 +103,13 @@ class KeyringCredentialStore(CredentialStore):
         Encrypt and save an OAuth token to the system keyring.
         """
         encrypted = self._encryptor.encrypt(token=token)
-        self._keyring.set_password("hivekit", organization_id, encrypted)
+        self._keyring.set_password(_KEYRING_SERVICE, organization_id, encrypted)
 
     def load_token(self, organization_id: str) -> Optional[dict]:
         """
         Load and decrypt an OAuth token from the system keyring.
         """
-        raw = self._keyring.get_password("hivekit", organization_id)
+        raw = self._keyring.get_password(_KEYRING_SERVICE, organization_id)
         if raw is None:
             logger.info(f"No stored token found in keyring for organization '{organization_id}'.")
             return None
@@ -120,7 +118,7 @@ class KeyringCredentialStore(CredentialStore):
         except Exception:
             logger.warning(
                 f"Failed to read stored token from keyring for organization '{organization_id}'. "
-                "The token may be corrupted or the machine ID may have changed."
+                "The token may be corrupted or the machine ID may have changed.", exc_info=True
             )
             return None
 
@@ -128,15 +126,12 @@ class KeyringCredentialStore(CredentialStore):
         """
         Delete an OAuth token from the system keyring.
         """
-        self._keyring.delete_password("hivekit", organization_id)
+        self._keyring.delete_password(_KEYRING_SERVICE, organization_id)
 
 
 class FileCredentialStore(CredentialStore):
     """
     Credential store backed by encrypted files on disk.
-
-    Tokens are encrypted with Fernet before being written to disk (although the encryption
-    key is the machine ID, so this is not a strong control).
     """
 
     def __init__(self, clients_dir: str, encryptor: TokenEncryptor) -> None:
@@ -175,7 +170,7 @@ class FileCredentialStore(CredentialStore):
         except Exception:
             logger.warning(
                 f"Failed to read stored token for organization '{organization_id}' from {path}. "
-                "The token may be corrupted or the machine ID may have changed."
+                "The token may be corrupted or the machine ID may have changed.", exc_info=True
             )
             return None
 
@@ -201,7 +196,9 @@ def create_credential_store(
     Create a credential store, preferring keyring if available.
 
     Falls back to file-based storage if the system keyring is not usable.
-    Both backends encrypt tokens using a Fernet key derived from the machine ID.
+    Both backends encrypt tokens using a Fernet key derived from the machine ID
+    (although this is not a strong security control since the machine ID is obtainable by any
+    process on the same host)
 
     Args:
         clients_dir: Directory for file-based credential storage.
@@ -211,8 +208,12 @@ def create_credential_store(
     encryptor = TokenEncryptor(machine_id=machine_id)
     try:
         # Probe whether the keyring backend is functional
-        keyring.get_password("hivekit", "_probe")
-        return KeyringCredentialStore(keyring_backend=keyring, encryptor=encryptor)
+        keyring_backend = keyring.get_keyring()
+        # Keyring comes with some "dummy" backends that have a priority of zero or less.
+        if keyring_backend.priority() <= 0:
+            raise ValueError(f"Keyring backend has a priority of {keyring_backend.priority}")
+        keyring_backend.get_password("hivekit", "_probe")
+        return KeyringCredentialStore(keyring_backend=keyring_backend, encryptor=encryptor)
     except Exception:
         logger.warning(
             "System keyring is not available. Credentials will be stored in the filesystem."

@@ -13,12 +13,12 @@ from rich.text import Text
 from cli import experiment
 from cli.auth.auth_utils import get_machine_id
 from cli.auth.credential_store import create_credential_store
-from cli.auth.oidc_flow import OidcLoginFlow
+from cli.auth.session_manager import create_session_manager
 from cli.completers import config_file_completer, experiment_completer
-from cli.config import load_config, load_organization_id
-from cli.http_client import AuthenticationError, HttpClient, build_http_client
+from cli.config import load_config
+from cli.http_client import AuthenticationError, HttpClient, create_http_client
 from cli.utils.config_paths import get_config_dir, get_config_path
-from cli.utils.url_utils import derive_identity_base_url, get_api_endpoint
+from cli.utils.url_utils import get_api_endpoint
 
 logger = logging.getLogger("hivekit")
 
@@ -28,17 +28,29 @@ except PackageNotFoundError:
     __version__ = "unknown"
 
 
-def _get_http_client(args: argparse.Namespace) -> HttpClient:
+def _get_http_client(args: argparse.Namespace) -> Optional[HttpClient]:
     """
     Build an HttpClient from the parsed command-line arguments.
+
+    Reads the organization ID from the config file when authentication is
+    enabled. Returns None and logs the error if authentication fails.
     """
-    return build_http_client(
-        no_auth=getattr(args, "no_auth", False),
-        insecure=getattr(args, "insecure", False),
-    )
+    try:
+        config = load_config(file_path=get_config_path())
+        return create_http_client(
+            organization_id=config.organization_id,
+            no_auth=getattr(args, "no_auth", False),
+            insecure=getattr(args, "insecure", False),
+        )
+    except AuthenticationError as e:
+        logger.error(f"Authentication error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to load configuration: {e}")
+        return None
 
 
-def _load_organization_id_or_error(console: Console) -> Optional[str]:
+def _load_organization_id_or_print_error(console: Console) -> Optional[str]:
     """
     Load the organization ID from the config file, printing an error if it
     cannot be found.
@@ -46,22 +58,42 @@ def _load_organization_id_or_error(console: Console) -> Optional[str]:
     Returns the organization ID, or None if the config file is missing or
     does not contain an organization_id.
     """
-    if not os.path.exists(get_config_path()):
+    config_path = get_config_path()
+    if not os.path.exists(config_path):
         console.print(
             "[bold red]Error:[/bold red] No configuration found. "
             "Please run 'hive init' first."
         )
         return None
 
-    organization_id = load_organization_id(file_path=get_config_path())
-    if not organization_id:
+    config = load_config(file_path=config_path)
+
+    if not config.organization_id:
         console.print(
             "[bold red]Error:[/bold red] No organization_id found in config. "
             "Please run 'hive init' to set it."
         )
         return None
 
-    return organization_id
+    return config.organization_id
+
+
+def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
+    """
+    Run the OIDC login flow for the given organization.
+    """
+    session_manager = create_session_manager(
+        organization_id=organization_id,
+        base_url=get_api_endpoint(),
+        insecure=insecure,
+    )
+
+    console.print("[yellow]Opening browser for login...[/yellow]")
+    try:
+        session_manager.login()
+        console.print("[bold green]✓ Login successful![/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
 
 
 def init(args) -> None:
@@ -176,43 +208,18 @@ provider:
     )
     existing_token = credential_store.load_token(organization_id=organization_id)
     if existing_token is None:
-        logger.info(f"No existing credentials for organization '{organization_id}'. Initiating login.")
+        logger.info(f"No existing credentials for organization '{organization_id}'. "
+                    f"Initiating login.")
         console.print()
         insecure = getattr(args, "insecure", False)
         _run_login(console=console, organization_id=organization_id, insecure=insecure)
-
-
-def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
-    """
-    Run the OIDC login flow for the given organization.
-    """
-    base_url = get_api_endpoint()
-    identity_base_url = derive_identity_base_url(api_endpoint=base_url)
-    credential_store = create_credential_store(
-        clients_dir=os.path.join(get_config_dir(), "clients"),
-        machine_id_func=get_machine_id,
-    )
-    flow = OidcLoginFlow(
-        identity_base_url=identity_base_url,
-        organization_id=organization_id,
-        credential_store=credential_store,
-        insecure=insecure,
-    )
-
-    console.print("[yellow]Opening browser for login...[/yellow]")
-    try:
-        flow.login()
-        console.print("[bold green]✓ Login successful![/bold green]")
-    except Exception as e:
-        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
 
 
 def login(args) -> None:
     """Log in to the Hive platform via OIDC."""
     console = Console()
 
-    # Load organization ID from config
-    organization_id = _load_organization_id_or_error(console)
+    organization_id = _load_organization_id_or_print_error(console)
     if organization_id is None:
         return
 
@@ -226,7 +233,7 @@ def logout(args) -> None:
     """
     console = Console()
 
-    organization_id = _load_organization_id_or_error(console)
+    organization_id = _load_organization_id_or_print_error(console)
     if organization_id is None:
         return
 
@@ -282,11 +289,8 @@ def create_experiment(args) -> None:
         console.print(f"[bold red]Error building experiment CRD:[/bold red] {e}")
         return
 
-    # Initialize HTTP client
-    try:
-        client = _get_http_client(args)
-    except AuthenticationError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+    client = _get_http_client(args)
+    if client is None:
         return
 
     # Send request to create experiment
@@ -296,7 +300,6 @@ def create_experiment(args) -> None:
         console.print("\n[bold green]✓ Experiment created successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
 
-        # Display additional info if available
         if result.get("metadata"):
             metadata = result["metadata"]
             if metadata.get("namespace"):
@@ -304,8 +307,6 @@ def create_experiment(args) -> None:
             if metadata.get("uid"):
                 console.print(f"[dim]UID:[/dim] {metadata['uid']}")
 
-    except AuthenticationError as e:
-        console.print(f"\n[bold red]✗ Authentication error:[/bold red] {e}")
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to create experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
@@ -322,11 +323,8 @@ def delete_experiment(args) -> None:
 
     console.print(f"\n[bold yellow]Deleting experiment:[/bold yellow] {experiment_name}")
 
-    # Initialize HTTP client
-    try:
-        client = _get_http_client(args)
-    except AuthenticationError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+    client = _get_http_client(args)
+    if client is None:
         return
 
     # Confirm deletion unless -y flag is set
@@ -347,8 +345,6 @@ def delete_experiment(args) -> None:
         console.print("\n[bold green]✓ Experiment deleted successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
 
-    except AuthenticationError as e:
-        console.print(f"\n[bold red]✗ Authentication error:[/bold red] {e}")
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to delete experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
@@ -364,11 +360,8 @@ def list_experiments(args) -> None:
 
     console.print("\n[bold cyan]Listing experiments...[/bold cyan]")
 
-    # Initialize HTTP client
-    try:
-        client = _get_http_client(args)
-    except AuthenticationError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+    client = _get_http_client(args)
+    if client is None:
         return
 
     # Send request to list experiments
@@ -403,8 +396,6 @@ def list_experiments(args) -> None:
         console.print(table)
         console.print(f"\n[dim]Total experiments:[/dim] {len(experiments)}")
 
-    except AuthenticationError as e:
-        console.print(f"\n[bold red]✗ Authentication error:[/bold red] {e}")
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to list experiments:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
@@ -421,11 +412,8 @@ def get_experiment(args) -> None:
 
     console.print(f"\n[bold cyan]Getting experiment:[/bold cyan] {experiment_name}")
 
-    # Initialize HTTP client
-    try:
-        client = _get_http_client(args)
-    except AuthenticationError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+    client = _get_http_client(args)
+    if client is None:
         return
 
     # Send request to get experiment
@@ -475,8 +463,6 @@ def get_experiment(args) -> None:
         console.print("\n[bold magenta]Status:[/bold magenta]")
         console.print(f"  [cyan]Phase:[/cyan] {status.get('phase', 'Unknown')}")
 
-    except AuthenticationError as e:
-        console.print(f"\n[bold red]✗ Authentication error:[/bold red] {e}")
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to get experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")

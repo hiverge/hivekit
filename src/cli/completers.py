@@ -1,6 +1,8 @@
 from argcomplete.completers import FilesCompleter
 
-from cli.http_client import build_http_client
+from cli.config import load_config
+from cli.http_client import create_http_client
+from cli.utils.config_paths import get_config_path
 
 
 def config_file_completer(prefix, **kwargs):
@@ -15,7 +17,8 @@ def config_file_completer(prefix, **kwargs):
 def experiment_completer(prefix, **kwargs):
     """Autocomplete for experiment names by fetching from the server."""
     try:
-        client = build_http_client()
+        config = load_config(file_path=get_config_path())
+        client = create_http_client(organization_id=config.organization_id)
 
         # Fetch experiments from server
         result = client.list_experiments()

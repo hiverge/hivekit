@@ -1,17 +1,17 @@
 """
-Unit tests for the HttpClient class and the build_http_client factory.
+Unit tests for the HttpClient class and the create_http_client factory.
 """
 
-import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
+from pytest_mock import MockerFixture
 
 from cli.http_client import (
     AuthenticationError,
     HttpClient,
-    build_http_client,
+    create_http_client,
 )
 
 
@@ -37,9 +37,9 @@ def _http_client(mock_on_auth_failure: MagicMock, mock_session: MagicMock) -> Ht
     An HttpClient configured with a mock session and mock auth callback.
     """
     return HttpClient(
+        base_url="https://example.com/api/v1",
         on_auth_failure=mock_on_auth_failure,
         session=mock_session,
-        base_url="https://example.com/api/v1",
     )
 
 
@@ -48,22 +48,15 @@ class TestHttpClientInit:
     Tests for the `HttpClient` initialization.
     """
 
-    def test_init_with_defaults(self, mock_on_auth_failure: MagicMock) -> None:
-        """
-        Test that the HttpClient uses the default base URL when none is provided.
-        """
-        # when
-        client = HttpClient(on_auth_failure=mock_on_auth_failure)
-
-        # then
-        assert client.base_url == "https://platform.hiverge.ai/api/v1"
-
     def test_init_with_custom_base_url(self, mock_on_auth_failure: MagicMock) -> None:
         """
         Test initialization with a custom base URL.
         """
         # when
-        client = HttpClient(on_auth_failure=mock_on_auth_failure, base_url="https://custom-server.com/api")
+        client = HttpClient(
+            base_url="https://custom-server.com/api",
+            on_auth_failure=mock_on_auth_failure,
+        )
 
         # then
         assert client.base_url == "https://custom-server.com/api"
@@ -73,21 +66,13 @@ class TestHttpClientInit:
         Test that a trailing slash is removed from the base URL.
         """
         # when
-        client = HttpClient(on_auth_failure=mock_on_auth_failure, base_url="https://server.com/api/")
+        client = HttpClient(
+            base_url="https://server.com/api/",
+            on_auth_failure=mock_on_auth_failure,
+        )
 
         # then
         assert client.base_url == "https://server.com/api"
-
-    @patch.dict(os.environ, {"HIVE_API_ENDPOINT": "https://env-server.com"})
-    def test_init_uses_env_variable(self, mock_on_auth_failure: MagicMock) -> None:
-        """
-        Test that the HIVE_API_ENDPOINT environment variable is used.
-        """
-        # when
-        client = HttpClient(on_auth_failure=mock_on_auth_failure)
-
-        # then
-        assert client.base_url == "https://env-server.com"
 
     def test_init_with_injected_session(self, mock_on_auth_failure: MagicMock) -> None:
         """
@@ -98,9 +83,9 @@ class TestHttpClientInit:
 
         # when
         client = HttpClient(
+            base_url="https://example.com",
             on_auth_failure=mock_on_auth_failure,
             session=mock_session,
-            base_url="https://example.com",
         )
 
         # then
@@ -118,9 +103,9 @@ class TestHttpClientInit:
         mock_session.get.return_value = mock_response
 
         client = HttpClient(
+            base_url="https://example.com",
             on_auth_failure=MagicMock(),
             session=mock_session,
-            base_url="https://example.com",
             insecure=True,
         )
 
@@ -148,9 +133,9 @@ class TestHttpClientInit:
         mock_session.get.return_value = mock_response
 
         client = HttpClient(
+            base_url="https://example.com",
             on_auth_failure=MagicMock(),
             session=mock_session,
-            base_url="https://example.com",
         )
 
         # when
@@ -365,9 +350,9 @@ class TestAuthenticationHandling:
         mock_reauth = MagicMock(side_effect=Exception("Reauth failed"))
 
         client = HttpClient(
+            base_url="https://example.com/api/v1",
             on_auth_failure=mock_reauth,
             session=mock_session,
-            base_url="https://example.com/api/v1",
         )
 
         # when / then
@@ -394,9 +379,9 @@ class TestAuthenticationHandling:
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
+            base_url="https://example.com/api/v1",
             on_auth_failure=mock_reauth,
             session=mock_session,
-            base_url="https://example.com/api/v1",
         )
 
         # when
@@ -406,28 +391,6 @@ class TestAuthenticationHandling:
         assert result == {"experiments": []}
         mock_reauth.assert_called_once()
         new_session.get.assert_called_once()
-
-    def test_401_with_failed_reauth_raises_authentication_error(self) -> None:
-        """
-        Test that a 401 response followed by a failed re-authentication attempt
-        raises AuthenticationError.
-        """
-        # given
-        mock_session = MagicMock()
-        mock_401 = MagicMock()
-        mock_401.status_code = 401
-        mock_session.get.return_value = mock_401
-        mock_reauth = MagicMock(side_effect=Exception("Login failed"))
-
-        client = HttpClient(
-            on_auth_failure=mock_reauth,
-            session=mock_session,
-            base_url="https://example.com/api/v1",
-        )
-
-        # when / then
-        with pytest.raises(AuthenticationError, match="credentials have expired"):
-            client.list_experiments()
 
     def test_401_after_reauth_retry_raises_authentication_error(self) -> None:
         """
@@ -445,9 +408,9 @@ class TestAuthenticationHandling:
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
+            base_url="https://example.com/api/v1",
             on_auth_failure=mock_reauth,
             session=mock_session,
-            base_url="https://example.com/api/v1",
         )
 
         # when / then
@@ -473,9 +436,9 @@ class TestAuthenticationHandling:
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
+            base_url="https://example.com/api/v1",
             on_auth_failure=mock_reauth,
             session=mock_session,
-            base_url="https://example.com/api/v1",
             insecure=True,
         )
 
@@ -499,168 +462,96 @@ class TestAuthenticationHandling:
         )
 
 
-class TestBuildHttpClient:
+class TestCreateHttpClient:
     """
-    Tests for the `build_http_client` factory function.
+    Tests for the `create_http_client` factory function.
     """
 
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    def test_no_auth_returns_unauthenticated_client(self, mock_get_endpoint: MagicMock) -> None:
+    def test_no_auth_returns_unauthenticated_client(self, mocker: MockerFixture) -> None:
         """
-        Test that build_http_client with no_auth=True returns an unauthenticated client.
+        Test that create_http_client with no_auth=True returns an unauthenticated client.
         """
+        # given
+        mock_get_endpoint = mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+
         # when
-        client = build_http_client(no_auth=True)
+        client = create_http_client(no_auth=True)
 
         # then
         assert client.base_url == "https://platform.hiverge.ai/api/v1"
         mock_get_endpoint.assert_called_once()
-        # The on_auth_failure callback should raise AuthenticationError
         with pytest.raises(AuthenticationError, match="Authentication is not configured"):
             client._on_auth_failure()
 
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    @patch("cli.http_client.os.path.exists", return_value=False)
-    def test_no_config_file_raises_authentication_error(
-        self, mock_exists: MagicMock, mock_get_endpoint: MagicMock
+    def test_no_organization_id_raises_authentication_error(
+        self, mocker: MockerFixture
     ) -> None:
         """
-        Test that build_http_client raises AuthenticationError when no config
-        file exists and no organization_id is provided.
+        Test that create_http_client raises AuthenticationError when no
+        organization_id is provided.
         """
+        # given
+        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+
         # when / then
         with pytest.raises(AuthenticationError, match="No organization ID configured"):
-            build_http_client()
+            create_http_client()
 
-    @patch("cli.http_client.OidcLoginFlow")
-    @patch("cli.http_client.create_credential_store")
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
     def test_with_organization_id_and_stored_token(
         self,
-        mock_get_endpoint: MagicMock,
-        mock_create_store: MagicMock,
-        mock_flow_class: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         """
-        Test that build_http_client with an explicit organization_id and a stored
+        Test that create_http_client with an explicit organization_id and a stored
         token creates an authenticated client.
         """
         # given
-        mock_store = MagicMock()
-        mock_store.load_token.return_value = {
-            "access_token": "stored-token",
-            "token_type": "Bearer",
-        }
-        mock_create_store.return_value = mock_store
+        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mock_create_sm = mocker.patch("cli.http_client.create_session_manager")
+        mock_sm = MagicMock()
+        mock_session = MagicMock()
+        mock_sm.load_session.return_value = mock_session
+        mock_create_sm.return_value = mock_sm
 
         # when
-        client = build_http_client(organization_id="my-org")
+        client = create_http_client(organization_id="my-org")
 
         # then
         assert client.base_url == "https://platform.hiverge.ai/api/v1"
-        mock_store.load_token.assert_called_once_with(organization_id="my-org")
+        mock_create_sm.assert_called_once_with(
+            organization_id="my-org",
+            base_url="https://platform.hiverge.ai/api/v1",
+            insecure=False,
+        )
+        mock_sm.load_session.assert_called_once()
 
-    @patch("cli.http_client.OidcLoginFlow")
-    @patch("cli.http_client.create_credential_store")
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    def test_no_stored_token_triggers_auto_login(
+    def test_no_stored_token_raises_authentication_error(
         self,
-        mock_get_endpoint: MagicMock,
-        mock_create_store: MagicMock,
-        mock_flow_class: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         """
-        Test that when no token is stored, auto-login is attempted via the login flow.
+        Test that when no token is stored, an AuthenticationError is raised.
         """
         # given
-        mock_store = MagicMock()
-        mock_store.load_token.return_value = None
-        mock_create_store.return_value = mock_store
-
-        mock_flow = MagicMock()
-        mock_flow.login.return_value = {
-            "access_token": "fresh-token",
-            "token_type": "Bearer",
-        }
-        mock_flow_class.return_value = mock_flow
-
-        # when
-        client = build_http_client(organization_id="my-org")
-
-        # then
-        mock_flow.login.assert_called_once()
-        assert client.base_url == "https://platform.hiverge.ai/api/v1"
-
-    @patch("cli.http_client.OidcLoginFlow")
-    @patch("cli.http_client.create_credential_store")
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    def test_no_stored_token_login_failure_raises_authentication_error(
-        self,
-        mock_get_endpoint: MagicMock,
-        mock_create_store: MagicMock,
-        mock_flow_class: MagicMock,
-    ) -> None:
-        """
-        Test that when no token is stored and auto-login fails, an
-        AuthenticationError is raised.
-        """
-        # given
-        mock_store = MagicMock()
-        mock_store.load_token.return_value = None
-        mock_create_store.return_value = mock_store
-
-        mock_flow = MagicMock()
-        mock_flow.login.side_effect = Exception("Browser failed")
-        mock_flow_class.return_value = mock_flow
+        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mock_create_sm = mocker.patch("cli.http_client.create_session_manager")
+        mock_sm = MagicMock()
+        mock_sm.load_session.return_value = None
+        mock_create_sm.return_value = mock_sm
 
         # when / then
-        with pytest.raises(AuthenticationError, match="Login failed"):
-            build_http_client(organization_id="my-org")
+        with pytest.raises(AuthenticationError, match="Not logged in"):
+            create_http_client(organization_id="my-org")
 
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    def test_insecure_flag_is_passed_through(self, mock_get_endpoint: MagicMock) -> None:
+    def test_insecure_flag_is_passed_through(self, mocker: MockerFixture) -> None:
         """
         Test that the insecure flag is passed through to the unauthenticated client.
         """
+        # given
+        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+
         # when
-        client = build_http_client(no_auth=True, insecure=True)
+        client = create_http_client(no_auth=True, insecure=True)
 
         # then
         assert client._insecure is True
-
-    @patch("cli.http_client.OidcLoginFlow")
-    @patch("cli.http_client.create_credential_store")
-    @patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
-    @patch("builtins.open", create=True)
-    @patch("cli.http_client.os.path.exists", return_value=True)
-    def test_reads_organization_id_from_config_file(
-        self,
-        mock_exists: MagicMock,
-        mock_open: MagicMock,
-        mock_get_endpoint: MagicMock,
-        mock_create_store: MagicMock,
-        mock_flow_class: MagicMock,
-    ) -> None:
-        """
-        Test that build_http_client reads the organization_id from the config file
-        when not provided explicitly.
-        """
-        # given
-        import io
-
-        mock_open.return_value.__enter__ = lambda s: io.StringIO("organization_id: file-org\n")
-        mock_open.return_value.__exit__ = MagicMock(return_value=False)
-
-        mock_store = MagicMock()
-        mock_store.load_token.return_value = {
-            "access_token": "token",
-            "token_type": "Bearer",
-        }
-        mock_create_store.return_value = mock_store
-
-        # when
-        client = build_http_client()
-
-        # then
-        mock_store.load_token.assert_called_once_with(organization_id="file-org")
-        assert client.base_url == "https://platform.hiverge.ai/api/v1"

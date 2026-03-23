@@ -72,7 +72,7 @@ class CallbackServer:
 
     def shutdown(self) -> None:
         """
-        Shut down the callback server.
+        Shut down the callback server in a separate thread (but does not wait for it to finish).
         """
         threading.Thread(target=self._server.shutdown, daemon=True).start()
 
