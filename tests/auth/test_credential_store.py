@@ -3,6 +3,7 @@ Tests for the credential store implementations in the auth module.
 """
 
 import os
+import stat
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -291,6 +292,27 @@ class TestFileCredentialStore:
         with open(path, "r") as f:
             content = f.read()
         assert "access-123" not in content
+
+    def test_saved_file_has_owner_only_permissions(
+        self, tmp_path: str, encryptor: TokenEncryptor, sample_token: dict
+    ) -> None:
+        """
+        Test that a saved credential file has mode 0600 (owner read/write only).
+        """
+        # given
+        clients_dir = str(tmp_path / "clients")
+        store = FileCredentialStore(clients_dir=clients_dir, encryptor=encryptor)
+
+        # when
+        store.save_token(organization_id="my-org", token=sample_token)
+
+        # then
+        file_path = os.path.join(clients_dir, "my-org_client")
+        file_mode = stat.S_IMODE(os.stat(file_path).st_mode)
+        assert file_mode == 0o600
+
+        dir_mode = stat.S_IMODE(os.stat(clients_dir).st_mode)
+        assert dir_mode == 0o700
 
 
 class TestCreateCredentialStore:

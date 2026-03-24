@@ -151,12 +151,20 @@ class FileCredentialStore(CredentialStore):
     def save_token(self, organization_id: str, token: Dict[str, Any]) -> None:
         """
         Encrypt and save an OAuth token to a file.
+
+        The file is created with mode 0600 (owner read/write only) and the
+        directory with mode 0700 (owner only) to protect stored credentials.
         """
-        os.makedirs(self._clients_dir, exist_ok=True)
+        os.makedirs(self._clients_dir, mode=0o700, exist_ok=True)
         path = self._token_path(organization_id=organization_id)
         encrypted = self._encryptor.encrypt(token=token)
-        with open(path, "w") as f:
-            f.write(encrypted)
+        # Use os.open with explicit flags to set permissions atomically,
+        # avoiding a window where the file is world-readable.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, encrypted.encode())
+        finally:
+            os.close(fd)
 
     def load_token(self, organization_id: str) -> Optional[Dict[str, Any]]:
         """
