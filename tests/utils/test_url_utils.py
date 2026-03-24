@@ -113,9 +113,12 @@ class TestBuildOidcEndpoints:
 
         # then
         assert endpoints == {
-            "authorization_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/protocol/openid-connect/auth",
-            "token_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/protocol/openid-connect/token",
-            "userinfo_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/protocol/openid-connect/userinfo",
+            "authorization_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/"
+                                      "protocol/openid-connect/auth",
+            "token_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/"
+                              "protocol/openid-connect/token",
+            "userinfo_endpoint": "https://platform.hiverge.ai/identity/realms/my-org/"
+                                 "protocol/openid-connect/userinfo",
         }
 
     def test_builds_endpoints_with_trailing_slash(self) -> None:
@@ -134,7 +137,10 @@ class TestBuildOidcEndpoints:
 
         # then
         assert endpoints == {
-            "authorization_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/protocol/openid-connect/auth",
-            "token_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/protocol/openid-connect/token",
-            "userinfo_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/protocol/openid-connect/userinfo",
+            "authorization_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/"
+                                      "protocol/openid-connect/auth",
+            "token_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/"
+                              "protocol/openid-connect/token",
+            "userinfo_endpoint": "https://platform.hiverge.ai/identity/realms/other-org/"
+                                 "protocol/openid-connect/userinfo",
         }

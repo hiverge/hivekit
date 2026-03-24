@@ -2,149 +2,167 @@
 Unit tests for argcomplete completer functions.
 """
 
-from typing import List
-from unittest.mock import MagicMock
-
-import pytest
-from pytest_mock import MockerFixture
+from unittest.mock import MagicMock, patch
 
 from cli.completers import config_file_completer, experiment_completer
 
-_ALL_EXPERIMENTS = [
-    {"metadata": {"name": "exp-1"}},
-    {"metadata": {"name": "exp-2"}},
-    {"metadata": {"name": "test-1"}},
-]
-
 
 class TestExperimentCompleter:
-    """
-    Tests for the `experiment_completer` function.
-    """
+    """Tests for experiment_completer function."""
 
-    @pytest.mark.parametrize(
-        "experiments, prefix, expected",
-        [
-            pytest.param(
-                _ALL_EXPERIMENTS,
-                "",
-                ["exp-1", "exp-2", "test-1"],
-                id="No prefix returns all names",
-            ),
-            pytest.param(
-                _ALL_EXPERIMENTS,
-                "exp",
-                ["exp-1", "exp-2"],
-                id="Prefix filters matching names",
-            ),
-            pytest.param(
-                {"experiments": []},
-                "",
-                [],
-                id="Empty response returns empty list",
-            ),
-            pytest.param(
-                [
-                    {"metadata": {"name": "exp-1"}},
-                    {"metadata": {}},
-                    {},
-                    {"metadata": {"name": "exp-2"}},
-                ],
-                "",
-                ["exp-1", "exp-2"],
-                id="Missing metadata is skipped",
-            ),
-        ],
-    )
-    def test_returns_matching_experiment_names(
-        self,
-        mocker: MockerFixture,
-        experiments: list,
-        prefix: str,
-        expected: List[str],
-    ) -> None:
-        """
-        Test that experiment_completer returns the correct experiment names
-        for various inputs.
-        """
-        # given
-        mock_load_config = mocker.patch("cli.completers.load_config")
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_success(self, mock_load_config, mock_create_client):
+        """Test experiment_completer successfully fetches and returns experiment names."""
+        # Setup mock client
         mock_config = MagicMock()
         mock_config.organization_id = "my-org"
         mock_load_config.return_value = mock_config
 
-        mock_build_client = mocker.patch("cli.completers.create_http_client")
         mock_client = MagicMock()
-        mock_build_client.return_value = mock_client
-        if isinstance(experiments, dict):
-            mock_client.list_experiments.return_value = experiments
-        else:
-            mock_client.list_experiments.return_value = {"experiments": experiments}
+        mock_create_client.return_value = mock_client
 
-        # when
-        result = experiment_completer(prefix)
+        # Mock API response
+        mock_client.list_experiments.return_value = {
+            "experiments": [
+                {"metadata": {"name": "exp-1"}},
+                {"metadata": {"name": "exp-2"}},
+                {"metadata": {"name": "exp-3"}},
+            ]
+        }
 
-        # then
-        assert result == expected
-        mock_build_client.assert_called_once_with(organization_id="my-org")
-
-    def test_returns_empty_list_on_api_error(
-        self, mocker: MockerFixture,
-    ) -> None:
-        """
-        Test that experiment_completer returns an empty list on API error.
-        """
-        # given
-        mock_load_config = mocker.patch("cli.completers.load_config")
-        mock_config = MagicMock()
-        mock_config.organization_id = "my-org"
-        mock_load_config.return_value = mock_config
-
-        mock_build_client = mocker.patch("cli.completers.create_http_client")
-        mock_client = MagicMock()
-        mock_build_client.return_value = mock_client
-        mock_client.list_experiments.side_effect = Exception("API error")
-
-        # when
+        # Call completer
         result = experiment_completer("")
 
-        # then
+        # Verify results
+        assert result == ["exp-1", "exp-2", "exp-3"]
+        mock_client.list_experiments.assert_called_once()
+        mock_create_client.assert_called_once_with(organization_id="my-org")
+
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_with_prefix(self, mock_load_config, mock_create_client):
+        """Test experiment_completer filters by prefix."""
+        # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
+        mock_client = MagicMock()
+        mock_create_client.return_value = mock_client
+
+        mock_client.list_experiments.return_value = {
+            "experiments": [
+                {"metadata": {"name": "exp-1"}},
+                {"metadata": {"name": "exp-2"}},
+                {"metadata": {"name": "test-1"}},
+            ]
+        }
+
+        # Call completer with prefix
+        result = experiment_completer("exp")
+
+        # Should only return experiments starting with "exp"
+        assert result == ["exp-1", "exp-2"]
+
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_api_error(self, mock_load_config, mock_create_client):
+        """Test experiment_completer returns empty list on API error."""
+        # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
+        mock_client = MagicMock()
+        mock_create_client.return_value = mock_client
+
+        # Simulate API error
+        mock_client.list_experiments.side_effect = Exception("API error")
+
+        # Call completer
+        result = experiment_completer("")
+
+        # Should return empty list on error
         assert result == []
+
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_empty_response(self, mock_load_config, mock_create_client):
+        """Test experiment_completer handles empty API response."""
+        # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
+        mock_client = MagicMock()
+        mock_create_client.return_value = mock_client
+
+        # Mock empty response
+        mock_client.list_experiments.return_value = {"experiments": []}
+
+        # Call completer
+        result = experiment_completer("")
+
+        # Should return empty list
+        assert result == []
+
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_missing_metadata(self, mock_load_config, mock_create_client):
+        """Test experiment_completer handles experiments with missing metadata."""
+        # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
+        mock_client = MagicMock()
+        mock_create_client.return_value = mock_client
+
+        # Mock response with missing/malformed data
+        mock_client.list_experiments.return_value = {
+            "experiments": [
+                {"metadata": {"name": "exp-1"}},
+                {"metadata": {}},  # Missing name
+                {},  # Missing metadata
+                {"metadata": {"name": "exp-2"}},
+            ]
+        }
+
+        # Call completer
+        result = experiment_completer("")
+
+        # Should only return valid experiment names
+        assert result == ["exp-1", "exp-2"]
 
 
 class TestConfigFileCompleter:
-    """
-    Tests for the `config_file_completer` function.
-    """
+    """Tests for config_file_completer function."""
 
-    def test_delegates_to_files_completer(self, mocker: MockerFixture) -> None:
-        """
-        Test that config_file_completer delegates to FilesCompleter.
-        """
-        # given
-        mock_files_completer = mocker.patch("cli.completers.FilesCompleter")
+    @patch("cli.completers.FilesCompleter")
+    def test_config_file_completer(self, mock_files_completer):
+        """Test config_file_completer delegates to FilesCompleter."""
+        # Setup mock
         mock_completer_instance = MagicMock()
         mock_completer_instance.return_value = ["/path/to/file1.yaml", "/path/to/file2.yaml"]
         mock_files_completer.return_value = mock_completer_instance
 
-        # when
+        # Call completer
         result = config_file_completer("~/.hive/")
 
-        # then
+        # Verify FilesCompleter was used
         mock_files_completer.assert_called_once()
         mock_completer_instance.assert_called_once_with("~/.hive/")
         assert result == ["/path/to/file1.yaml", "/path/to/file2.yaml"]
 
-    def test_returns_empty_list_on_error(self, mocker: MockerFixture) -> None:
-        """
-        Test that config_file_completer returns an empty list on error.
-        """
-        # given
-        mock_files_completer = mocker.patch("cli.completers.FilesCompleter")
+    @patch("cli.completers.FilesCompleter")
+    def test_config_file_completer_error(self, mock_files_completer):
+        """Test config_file_completer returns empty list on error."""
+        # Setup mock to raise exception
         mock_files_completer.side_effect = Exception("Completer error")
 
-        # when
+        # Call completer
         result = config_file_completer("~/.hive/")
 
-        # then
+        # Should return empty list on error
         assert result == []

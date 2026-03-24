@@ -188,6 +188,24 @@ class TestHttpClientCreateExperiment:
         with pytest.raises(Exception, match="Failed to create experiment: Bad request"):
             http_client.create_experiment({"metadata": {"name": "test"}})
 
+    def test_create_experiment_http_error_with_text(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+        """
+        Test that create_experiment handles an HTTP error with a text (non-JSON) response.
+        """
+        # given
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.json.side_effect = ValueError("Not JSON")
+        mock_response.text = "Server error"
+        http_error = requests.exceptions.HTTPError()
+        http_error.response = mock_response
+        mock_response.raise_for_status.side_effect = http_error
+        mock_session.request.return_value = mock_response
+
+        # when / then
+        with pytest.raises(Exception, match="Failed to create experiment: Server error"):
+            http_client.create_experiment({"metadata": {"name": "test"}})
+
     def test_create_experiment_connection_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
         """
         Test that create_experiment handles connection errors.

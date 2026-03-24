@@ -3,7 +3,7 @@ Tests for the credential store implementations in the auth module.
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -109,13 +109,9 @@ class TestKeyringCredentialStore:
         store.save_token(organization_id="my-org", token=sample_token)
 
         # then
-        mock_keyring.set_password.assert_called_once()
-        call_args = mock_keyring.set_password.call_args
-        assert call_args[0][0] == "hivekit"
-        assert call_args[0][1] == "my-org"
-        # The stored value should be encrypted and decryptable
-        stored_value = call_args[0][2]
-        assert encryptor.decrypt(data=stored_value) == sample_token
+        mock_keyring.set_password.assert_called_once_with("hivekit", "my-org", ANY)
+        encrypted_value = mock_keyring.set_password.call_args[0][2]
+        assert encryptor.decrypt(data=encrypted_value) == sample_token
 
     def test_load_token(
         self,
@@ -169,6 +165,32 @@ class TestKeyringCredentialStore:
 
         # then
         mock_keyring.delete_password.assert_called_once_with("hivekit", "my-org")
+
+    def test_save_and_load_round_trip(
+        self,
+        mock_keyring: MagicMock,
+        encryptor: TokenEncryptor,
+        sample_token: dict,
+    ) -> None:
+        """
+        Test that a token saved to the keyring can be loaded back correctly.
+        """
+        # given
+        stored_data = {}
+        mock_keyring.set_password.side_effect = (
+            lambda service, username, password: stored_data.update({(service, username): password})
+        )
+        mock_keyring.get_password.side_effect = lambda service, username: stored_data.get(
+            (service, username)
+        )
+        store = KeyringCredentialStore(keyring_backend=mock_keyring, encryptor=encryptor)
+
+        # when
+        store.save_token(organization_id="my-org", token=sample_token)
+        result = store.load_token(organization_id="my-org")
+
+        # then
+        assert result == sample_token
 
 
 class TestFileCredentialStore:
@@ -271,6 +293,79 @@ class TestFileCredentialStore:
         assert "access-123" not in content
 
 
+@pytest.mark.integration
+class TestKeyringCredentialStoreIntegration:
+    """
+    Integration tests for the `KeyringCredentialStore` using a real keyring backend.
+    """
+
+    _SERVICE = "hivekit"
+    _ORG_ID = "integration-test-org"
+
+    @pytest.fixture(name="keyring_store")
+    def _keyring_store(self, encryptor: TokenEncryptor) -> KeyringCredentialStore:
+        """
+        A KeyringCredentialStore backed by the real system keyring.
+        Cleans up any stored tokens after the test.
+        """
+        import keyring as real_keyring
+
+        backend = real_keyring.get_keyring()
+        store = KeyringCredentialStore(keyring_backend=backend, encryptor=encryptor)
+        yield store
+        # Cleanup: remove the test entry from the keyring
+        try:
+            backend.delete_password(self._SERVICE, self._ORG_ID)
+        except Exception:
+            pass
+
+    def test_save_and_load_round_trip(
+        self,
+        keyring_store: KeyringCredentialStore,
+        sample_token: dict,
+    ) -> None:
+        """
+        Test that a token can be saved to and loaded from the real system keyring.
+        """
+        # when
+        keyring_store.save_token(organization_id=self._ORG_ID, token=sample_token)
+        result = keyring_store.load_token(organization_id=self._ORG_ID)
+
+        # then
+        assert result == sample_token
+
+    def test_delete_token(
+        self,
+        keyring_store: KeyringCredentialStore,
+        sample_token: dict,
+    ) -> None:
+        """
+        Test that a token can be deleted from the real system keyring.
+        """
+        # given
+        keyring_store.save_token(organization_id=self._ORG_ID, token=sample_token)
+
+        # when
+        keyring_store.delete_token(organization_id=self._ORG_ID)
+        result = keyring_store.load_token(organization_id=self._ORG_ID)
+
+        # then
+        assert result is None
+
+    def test_load_returns_none_when_no_entry_exists(
+        self,
+        keyring_store: KeyringCredentialStore,
+    ) -> None:
+        """
+        Test that loading a non-existent token from the real keyring returns None.
+        """
+        # when
+        result = keyring_store.load_token(organization_id=self._ORG_ID)
+
+        # then
+        assert result is None
+
+
 class TestCreateCredentialStore:
     """
     Tests for the `create_credential_store` factory function.
@@ -282,7 +377,10 @@ class TestCreateCredentialStore:
         Test that the factory returns a KeyringCredentialStore when keyring is available.
         """
         # given
-        mock_keyring.get_password.return_value = None
+        mock_backend = MagicMock()
+        mock_backend.priority.return_value = 5
+        mock_backend.get_password.return_value = None
+        mock_keyring.get_keyring.return_value = mock_backend
 
         # when
         store = create_credential_store(
@@ -292,7 +390,7 @@ class TestCreateCredentialStore:
 
         # then
         assert isinstance(store, KeyringCredentialStore)
-        mock_keyring.get_password.assert_called_once_with("hivekit", "_probe")
+        mock_backend.get_password.assert_called_once_with("hivekit", "_probe")
 
     @patch("cli.auth.credential_store.keyring")
     def test_returns_file_store_when_keyring_unavailable(
@@ -302,7 +400,10 @@ class TestCreateCredentialStore:
         Test that the factory falls back to FileCredentialStore when keyring raises an exception.
         """
         # given
-        mock_keyring.get_password.side_effect = Exception("No keyring backend")
+        mock_backend = MagicMock()
+        mock_backend.priority.return_value = 5
+        mock_backend.get_password.side_effect = Exception("No keyring backend")
+        mock_keyring.get_keyring.return_value = mock_backend
 
         # when
         store = create_credential_store(
@@ -312,4 +413,4 @@ class TestCreateCredentialStore:
 
         # then
         assert isinstance(store, FileCredentialStore)
-        mock_keyring.get_password.assert_called_once_with("hivekit", "_probe")
+        mock_backend.get_password.assert_called_once_with("hivekit", "_probe")
