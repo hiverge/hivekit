@@ -4,8 +4,8 @@ Integration tests for the `KeyringCredentialStore` using a real keyring backend.
 
 from typing import Dict, Generator
 
-import pytest
 import keyring as real_keyring
+import pytest
 
 from cli.auth.credential_store import KeyringCredentialStore, TokenEncryptor
 
