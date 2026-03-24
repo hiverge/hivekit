@@ -18,9 +18,12 @@ jobs:
         uses: yezz123/setup-uv@v4
 
       - name: Install dependencies
+        # We install keyrings.alt here so that we can use keyring without a real
+        # backend on Github.
         run: |
           uv venv
           uv pip install -e ".[dev,test]"
+          uv pip install keyrings.alt
 
       - name: Lint
         run: uv run make lint
