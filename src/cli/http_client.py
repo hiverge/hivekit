@@ -3,6 +3,7 @@ HTTP client for communicating with the Hive backend server.
 """
 
 import logging
+from http import HTTPStatus
 from typing import Any, Callable, Dict, Optional
 
 import requests
@@ -13,8 +14,6 @@ from cli.utils.url_utils import get_api_endpoint
 
 console = Console()
 logger = logging.getLogger("hivekit")
-
-_HTTP_UNAUTHORIZED = 401
 
 
 class AuthenticationError(Exception):
@@ -158,7 +157,7 @@ class HttpClient:
             method=method, url=url, headers=headers, json=json, timeout=30,
             verify=not self._insecure,
         )
-        if response.status_code == _HTTP_UNAUTHORIZED:
+        if response.status_code == HTTPStatus.UNAUTHORIZED:
             return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
         return response
 
@@ -185,7 +184,7 @@ class HttpClient:
             method=method, url=url, headers=headers, json=json, timeout=30,
             verify=not self._insecure,
         )
-        if response.status_code == _HTTP_UNAUTHORIZED:
+        if response.status_code == HTTPStatus.UNAUTHORIZED:
             raise AuthenticationError(
                 "Your credentials have expired. Please run 'hive login' to re-authenticate."
             )
