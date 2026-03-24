@@ -48,7 +48,9 @@ class TestHttpClientInit:
     Tests for the `HttpClient` initialization.
     """
 
-    def test_init_with_custom_base_url(self, mock_on_auth_failure: MagicMock) -> None:
+    def test_init_with_custom_base_url(
+        self, mock_on_auth_failure: MagicMock, mock_session: MagicMock,
+    ) -> None:
         """
         Test initialization with a custom base URL.
         """
@@ -56,12 +58,15 @@ class TestHttpClientInit:
         client = HttpClient(
             base_url="https://custom-server.com/api",
             on_auth_failure=mock_on_auth_failure,
+            session=mock_session,
         )
 
         # then
         assert client.base_url == "https://custom-server.com/api"
 
-    def test_init_strips_trailing_slash(self, mock_on_auth_failure: MagicMock) -> None:
+    def test_init_strips_trailing_slash(
+        self, mock_on_auth_failure: MagicMock, mock_session: MagicMock,
+    ) -> None:
         """
         Test that a trailing slash is removed from the base URL.
         """
@@ -69,27 +74,11 @@ class TestHttpClientInit:
         client = HttpClient(
             base_url="https://server.com/api/",
             on_auth_failure=mock_on_auth_failure,
-        )
-
-        # then
-        assert client.base_url == "https://server.com/api"
-
-    def test_init_with_injected_session(self, mock_on_auth_failure: MagicMock) -> None:
-        """
-        Test that an injected session is used instead of creating a new one.
-        """
-        # given
-        mock_session = MagicMock(spec=requests.Session)
-
-        # when
-        client = HttpClient(
-            base_url="https://example.com",
-            on_auth_failure=mock_on_auth_failure,
             session=mock_session,
         )
 
         # then
-        assert client._session is mock_session
+        assert client.base_url == "https://server.com/api"
 
     def test_insecure_passes_verify_false_in_requests(self) -> None:
         """
@@ -100,7 +89,7 @@ class TestHttpClientInit:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"experiments": []}
-        mock_session.get.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         client = HttpClient(
             base_url="https://example.com",
@@ -113,8 +102,9 @@ class TestHttpClientInit:
         client.list_experiments()
 
         # then
-        mock_session.get.assert_called_once_with(
-            "https://example.com/experiments",
+        mock_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/experiments",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
@@ -130,7 +120,7 @@ class TestHttpClientInit:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"experiments": []}
-        mock_session.get.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         client = HttpClient(
             base_url="https://example.com",
@@ -142,8 +132,9 @@ class TestHttpClientInit:
         client.list_experiments()
 
         # then
-        mock_session.get.assert_called_once_with(
-            "https://example.com/experiments",
+        mock_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/experiments",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
@@ -164,15 +155,16 @@ class TestHttpClientCreateExperiment:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"metadata": {"name": "test-exp"}}
-        mock_session.post.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         # when
         result = http_client.create_experiment({"metadata": {"name": "test-exp"}})
 
         # then
         assert result == {"metadata": {"name": "test-exp"}}
-        mock_session.post.assert_called_once_with(
-            "https://example.com/api/v1/experiments",
+        mock_session.request.assert_called_once_with(
+            method="post",
+            url="https://example.com/api/v1/experiments",
             headers={"Content-Type": "application/json"},
             json={"metadata": {"name": "test-exp"}},
             timeout=30,
@@ -190,7 +182,7 @@ class TestHttpClientCreateExperiment:
         http_error = requests.exceptions.HTTPError()
         http_error.response = mock_response
         mock_response.raise_for_status.side_effect = http_error
-        mock_session.post.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         # when / then
         with pytest.raises(Exception, match="Failed to create experiment: Bad request"):
@@ -201,7 +193,7 @@ class TestHttpClientCreateExperiment:
         Test that create_experiment handles connection errors.
         """
         # given
-        mock_session.post.side_effect = requests.exceptions.ConnectionError("Connection failed")
+        mock_session.request.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
         # when / then
         with pytest.raises(Exception, match="Failed to connect to backend server"):
@@ -221,15 +213,16 @@ class TestHttpClientGetExperiment:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"metadata": {"name": "test-exp"}}
-        mock_session.get.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         # when
         result = http_client.get_experiment("test-exp")
 
         # then
         assert result == {"metadata": {"name": "test-exp"}}
-        mock_session.get.assert_called_once_with(
-            "https://example.com/api/v1/experiments/test-exp",
+        mock_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/api/v1/experiments/test-exp",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
@@ -241,7 +234,7 @@ class TestHttpClientGetExperiment:
         Test that get_experiment handles errors.
         """
         # given
-        mock_session.get.side_effect = requests.exceptions.RequestException("Error")
+        mock_session.request.side_effect = requests.exceptions.RequestException("Error")
 
         # when / then
         with pytest.raises(Exception, match="Failed to get experiment"):
@@ -263,7 +256,7 @@ class TestHttpClientListExperiments:
         mock_response.json.return_value = {
             "experiments": [{"metadata": {"name": "exp1"}}, {"metadata": {"name": "exp2"}}]
         }
-        mock_session.get.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         # when
         result = http_client.list_experiments()
@@ -272,8 +265,9 @@ class TestHttpClientListExperiments:
         assert result == {
             "experiments": [{"metadata": {"name": "exp1"}}, {"metadata": {"name": "exp2"}}]
         }
-        mock_session.get.assert_called_once_with(
-            "https://example.com/api/v1/experiments",
+        mock_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/api/v1/experiments",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
@@ -285,7 +279,7 @@ class TestHttpClientListExperiments:
         Test that list_experiments handles errors.
         """
         # given
-        mock_session.get.side_effect = requests.exceptions.RequestException("Error")
+        mock_session.request.side_effect = requests.exceptions.RequestException("Error")
 
         # when / then
         with pytest.raises(Exception, match="Failed to list experiments"):
@@ -305,15 +299,16 @@ class TestHttpClientDeleteExperiment:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"message": "Deleted"}
-        mock_session.delete.return_value = mock_response
+        mock_session.request.return_value = mock_response
 
         # when
         result = http_client.delete_experiment("test-exp")
 
         # then
         assert result == {"message": "Deleted"}
-        mock_session.delete.assert_called_once_with(
-            "https://example.com/api/v1/experiments/test-exp",
+        mock_session.request.assert_called_once_with(
+            method="delete",
+            url="https://example.com/api/v1/experiments/test-exp",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
@@ -325,7 +320,7 @@ class TestHttpClientDeleteExperiment:
         Test that delete_experiment handles errors.
         """
         # given
-        mock_session.delete.side_effect = requests.exceptions.RequestException("Error")
+        mock_session.request.side_effect = requests.exceptions.RequestException("Error")
 
         # when / then
         with pytest.raises(Exception, match="Failed to delete experiment"):
@@ -346,7 +341,7 @@ class TestAuthenticationHandling:
         mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 401
-        mock_session.get.return_value = mock_response
+        mock_session.request.return_value = mock_response
         mock_reauth = MagicMock(side_effect=Exception("Reauth failed"))
 
         client = HttpClient(
@@ -372,10 +367,10 @@ class TestAuthenticationHandling:
         mock_200 = MagicMock()
         mock_200.status_code = 200
         mock_200.json.return_value = {"experiments": []}
-        mock_session.get.return_value = mock_401
+        mock_session.request.return_value = mock_401
 
         new_session = MagicMock()
-        new_session.get.return_value = mock_200
+        new_session.request.return_value = mock_200
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
@@ -390,7 +385,7 @@ class TestAuthenticationHandling:
         # then
         assert result == {"experiments": []}
         mock_reauth.assert_called_once()
-        new_session.get.assert_called_once()
+        new_session.request.assert_called_once()
 
     def test_401_after_reauth_retry_raises_authentication_error(self) -> None:
         """
@@ -401,10 +396,10 @@ class TestAuthenticationHandling:
         mock_session = MagicMock()
         mock_401 = MagicMock()
         mock_401.status_code = 401
-        mock_session.get.return_value = mock_401
+        mock_session.request.return_value = mock_401
 
         new_session = MagicMock()
-        new_session.get.return_value = mock_401
+        new_session.request.return_value = mock_401
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
@@ -429,10 +424,10 @@ class TestAuthenticationHandling:
         mock_200 = MagicMock()
         mock_200.status_code = 200
         mock_200.json.return_value = {"experiments": []}
-        mock_session.get.return_value = mock_401
+        mock_session.request.return_value = mock_401
 
         new_session = MagicMock()
-        new_session.get.return_value = mock_200
+        new_session.request.return_value = mock_200
         mock_reauth = MagicMock(return_value=new_session)
 
         client = HttpClient(
@@ -446,15 +441,17 @@ class TestAuthenticationHandling:
         client.list_experiments()
 
         # then
-        mock_session.get.assert_called_once_with(
-            "https://example.com/api/v1/experiments",
+        mock_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/api/v1/experiments",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,
             verify=False,
         )
-        new_session.get.assert_called_once_with(
-            "https://example.com/api/v1/experiments",
+        new_session.request.assert_called_once_with(
+            method="get",
+            url="https://example.com/api/v1/experiments",
             headers={"Content-Type": "application/json"},
             json=None,
             timeout=30,

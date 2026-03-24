@@ -32,7 +32,7 @@ class HttpClient:
         self,
         base_url: str,
         on_auth_failure: Callable[[], requests.Session],
-        session: Optional[requests.Session] = None,
+        session: requests.Session,
         insecure: bool = False,
     ) -> None:
         """
@@ -46,7 +46,7 @@ class HttpClient:
             insecure: If True, disable SSL certificate verification on all requests.
         """
         self.base_url = base_url.rstrip("/")
-        self._session = session or requests.Session()
+        self._session = session
         self._on_auth_failure = on_auth_failure
         self._insecure = insecure
 
@@ -154,24 +154,13 @@ class HttpClient:
         Make an HTTP request, automatically retrying once on 401 by invoking
         the on_auth_failure callback.
         """
-        response = self._send_request(method, url, headers, json)
-        if response.status_code == _HTTP_UNAUTHORIZED:
-            return self._retry_with_reauth(method, url, headers, json)
-        return response
-
-    def _send_request(
-        self,
-        method: str,
-        url: str,
-        headers: Dict[str, str],
-        json: Optional[Dict[str, Any]] = None,
-    ) -> requests.Response:
-        """
-        Send a single HTTP request.
-        """
-        return getattr(self._session, method)(
-            url, headers=headers, json=json, timeout=30, verify=not self._insecure
+        response = self._session.request(
+            method=method, url=url, headers=headers, json=json, timeout=30,
+            verify=not self._insecure,
         )
+        if response.status_code == _HTTP_UNAUTHORIZED:
+            return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
+        return response
 
     def _retry_with_reauth(
         self,
@@ -190,7 +179,10 @@ class HttpClient:
             raise AuthenticationError(
                 "Your credentials have expired. Please run 'hive login' to re-authenticate."
             ) from e
-        response = self._send_request(method, url, headers, json)
+        response = self._session.request(
+            method=method, url=url, headers=headers, json=json, timeout=30,
+            verify=not self._insecure,
+        )
         if response.status_code == _HTTP_UNAUTHORIZED:
             raise AuthenticationError(
                 "Your credentials have expired. Please run 'hive login' to re-authenticate."
