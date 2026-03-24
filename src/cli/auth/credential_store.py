@@ -131,7 +131,10 @@ class KeyringCredentialStore(CredentialStore):
 
 class FileCredentialStore(CredentialStore):
     """
-    Credential store backed by encrypted files on disk.
+    Credential store backed by files on disk.
+
+    This should *not* be used except as a backup if `KeyringCredentialStore` is not available.
+    Although files are encrypted, the encryption key is the machine ID so this is not secure.
     """
 
     def __init__(self, clients_dir: str, encryptor: TokenEncryptor) -> None:
