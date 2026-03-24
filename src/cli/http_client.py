@@ -175,6 +175,8 @@ class HttpClient:
         logger.info("Received 401 response. Attempting to re-authenticate.")
         try:
             self._session = self._on_auth_failure()
+        except AuthenticationError:
+            raise
         except Exception as e:
             raise AuthenticationError(
                 "Your credentials have expired. Please run 'hive login' to re-authenticate."
@@ -217,7 +219,7 @@ def create_http_client(
     base_url = get_api_endpoint()
     if no_auth:
         on_auth_failure = _raise_not_configured
-        session = requests.Session(),
+        session = requests.Session()
     else:
         if organization_id is None:
             raise AuthenticationError(

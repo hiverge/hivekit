@@ -72,8 +72,18 @@ class CallbackServer:
     def shutdown(self) -> None:
         """
         Shut down the callback server in a separate thread (but does not wait for it to finish).
+
+        This ensures that the underlying HTTPServer both stops handling requests and
+        closes its listening socket so the port can be reused promptly.
         """
-        threading.Thread(target=self._server.shutdown, daemon=True).start()
+        def _shutdown() -> None:
+            try:
+                self._server.shutdown()
+            finally:
+                # Ensure the listening socket is closed even if shutdown() raises.
+                self._server.server_close()
+
+        threading.Thread(target=_shutdown, daemon=True).start()
 
 
 class OidcLoginFlow:

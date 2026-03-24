@@ -5,6 +5,7 @@ import subprocess
 from importlib.metadata import PackageNotFoundError, version
 
 import argcomplete
+import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -74,12 +75,14 @@ def init(args) -> None:
         return
 
     # Default configuration template
+    # Use yaml.safe_dump to properly quote the organization_id to prevent YAML injection
+    safe_organization_id = yaml.safe_dump(organization_id, default_style="'").strip()
     default_config = f"""# Hive Configuration File
 # This file contains the configuration for your Hive experiments.
 
 # Uncomment and configure the following fields as needed:
 
-organization_id: {organization_id}
+organization_id: {safe_organization_id}
 
 log_level: INFO
 
