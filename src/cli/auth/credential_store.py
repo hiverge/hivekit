@@ -131,7 +131,8 @@ class KeyringCredentialStore(CredentialStore):
 
 class FileCredentialStore(CredentialStore):
     """
-    Credential store backed by files on disk.
+    Credential store backed by files on disk. Files are stored with owner-only permissions
+    (0o600).
 
     This should *not* be used except as a backup if `KeyringCredentialStore` is not available.
     Although files are encrypted, the encryption key is the machine ID so this is not secure.
