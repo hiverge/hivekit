@@ -69,7 +69,7 @@ LOGIN_SUCCESS_HTML: bytes = f"""<!DOCTYPE html>
     {_LOGO_SVG}
   </div>
   <h1>Login successful!</h1>
-  <p>You can <a href="javascript:window.close()">close this window</a> and return to the Hive CLI.</p>
+  <p>You can close this window and return to the Hive CLI.</p>
 </div>
 </body>
 </html>""".encode()

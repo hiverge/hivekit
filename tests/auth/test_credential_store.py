@@ -305,7 +305,7 @@ class TestCreateCredentialStore:
         """
         # given
         mock_backend = MagicMock()
-        mock_backend.priority.return_value = 5
+        mock_backend.priority = 5
         mock_backend.get_password.return_value = None
         mock_keyring.get_keyring.return_value = mock_backend
 
@@ -328,7 +328,7 @@ class TestCreateCredentialStore:
         """
         # given
         mock_backend = MagicMock()
-        mock_backend.priority.return_value = 5
+        mock_backend.priority = 5
         mock_backend.get_password.side_effect = Exception("No keyring backend")
         mock_keyring.get_keyring.return_value = mock_backend
 

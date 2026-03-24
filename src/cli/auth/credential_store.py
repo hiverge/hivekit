@@ -210,7 +210,7 @@ def create_credential_store(
         # Probe whether the keyring backend is functional
         keyring_backend = keyring.get_keyring()
         # Keyring comes with some "dummy" backends that have a priority of zero or less.
-        if keyring_backend.priority() <= 0:
+        if keyring_backend.priority <= 0:
             raise ValueError(f"Keyring backend has a priority of {keyring_backend.priority}")
         keyring_backend.get_password("hivekit", "_probe")
         return KeyringCredentialStore(keyring_backend=keyring_backend, encryptor=encryptor)

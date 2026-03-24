@@ -191,3 +191,5 @@ def load_config(file_path: str) -> HiveConfig:
 
     # set the logging level.
     logger.set_log_level(config.log_level)
+
+    return config
