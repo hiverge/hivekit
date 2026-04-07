@@ -10,13 +10,17 @@ from cli.completers import config_file_completer, experiment_completer
 class TestExperimentCompleter:
     """Tests for experiment_completer function."""
 
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_success(self, mock_client_class):
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_success(self, mock_load_config, mock_create_client):
         """Test experiment_completer successfully fetches and returns experiment names."""
         # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
         mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = "test-token"
+        mock_create_client.return_value = mock_client
 
         # Mock API response
         mock_client.list_experiments.return_value = {
@@ -33,14 +37,19 @@ class TestExperimentCompleter:
         # Verify results
         assert result == ["exp-1", "exp-2", "exp-3"]
         mock_client.list_experiments.assert_called_once()
+        mock_create_client.assert_called_once_with(organization_id="my-org")
 
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_with_prefix(self, mock_client_class):
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_with_prefix(self, mock_load_config, mock_create_client):
         """Test experiment_completer filters by prefix."""
         # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
         mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = "test-token"
+        mock_create_client.return_value = mock_client
 
         mock_client.list_experiments.return_value = {
             "experiments": [
@@ -56,28 +65,17 @@ class TestExperimentCompleter:
         # Should only return experiments starting with "exp"
         assert result == ["exp-1", "exp-2"]
 
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_no_token(self, mock_client_class):
-        """Test experiment_completer returns empty list when no token is available."""
-        # Setup mock client without token
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = None
-
-        # Call completer
-        result = experiment_completer("")
-
-        # Should return empty list when no token
-        assert result == []
-        mock_client.list_experiments.assert_not_called()
-
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_api_error(self, mock_client_class):
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_api_error(self, mock_load_config, mock_create_client):
         """Test experiment_completer returns empty list on API error."""
         # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
         mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = "test-token"
+        mock_create_client.return_value = mock_client
 
         # Simulate API error
         mock_client.list_experiments.side_effect = Exception("API error")
@@ -88,13 +86,17 @@ class TestExperimentCompleter:
         # Should return empty list on error
         assert result == []
 
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_empty_response(self, mock_client_class):
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_empty_response(self, mock_load_config, mock_create_client):
         """Test experiment_completer handles empty API response."""
         # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
         mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = "test-token"
+        mock_create_client.return_value = mock_client
 
         # Mock empty response
         mock_client.list_experiments.return_value = {"experiments": []}
@@ -105,13 +107,17 @@ class TestExperimentCompleter:
         # Should return empty list
         assert result == []
 
-    @patch("cli.completers.HttpClient")
-    def test_experiment_completer_missing_metadata(self, mock_client_class):
+    @patch("cli.completers.create_http_client")
+    @patch("cli.completers.load_config")
+    def test_experiment_completer_missing_metadata(self, mock_load_config, mock_create_client):
         """Test experiment_completer handles experiments with missing metadata."""
         # Setup mock client
+        mock_config = MagicMock()
+        mock_config.organization_id = "my-org"
+        mock_load_config.return_value = mock_config
+
         mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_client.auth_token = "test-token"
+        mock_create_client.return_value = mock_client
 
         # Mock response with missing/malformed data
         mock_client.list_experiments.return_value = {

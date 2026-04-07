@@ -24,6 +24,9 @@ dependencies = [
     "argcomplete>=3.0.0",
     "requests>=2.28.0",
     "authlib>=1.2.0",
+    "keyring>=25.0.0",
+    "py-machineid>=0.6.0",
+    "cryptography>=42.0.0",
 ]
 
 [dependency-groups]
@@ -37,6 +40,7 @@ test = [
   "flask==2.3.3",
   "requests",
   "psutil",
+  "pytest-mock"
 ]
 lint = [
   "ruff>=0.12",
@@ -60,8 +64,11 @@ quote-style = "double"
 include-package-data = true
 
 [tool.setuptools.package-data]
-"cli" = ["libs/**/*"]
+"cli" = ["libs/**/*", "auth/*.svg"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "integration: integration tests that require real system resources (e.g. keyring)",
+]

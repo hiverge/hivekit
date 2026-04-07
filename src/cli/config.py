@@ -149,6 +149,10 @@ class RuntimeConfig(BaseModel):
 
 
 class HiveConfig(BaseModel):
+    organization_id: Optional[str] = Field(
+        default=None,
+        description="The organization ID to associate the experiment with.",
+    )
     # team_id: str = Field(
     #     description="The team ID to associate the experiment with. This is required for multi-tenant environments.",
     # )
@@ -187,3 +191,5 @@ def load_config(file_path: str) -> HiveConfig:
 
     # set the logging level.
     logger.set_log_level(config.log_level)
+
+    return config

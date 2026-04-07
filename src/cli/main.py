@@ -1,17 +1,26 @@
 import argparse
+import logging
 import os
 import subprocess
 from importlib.metadata import PackageNotFoundError, version
 
 import argcomplete
+import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
 from cli import experiment
+from cli.auth.auth_utils import get_machine_id
+from cli.auth.credential_store import create_credential_store
+from cli.auth.session_manager import create_session_manager
 from cli.completers import config_file_completer, experiment_completer
 from cli.config import load_config
-from cli.http_client import HttpClient
+from cli.http_client import HttpClient, create_http_client
+from cli.utils.config_paths import get_config_dir, get_config_path
+from cli.utils.url_utils import get_api_endpoint
+
+logger = logging.getLogger("hivekit")
 
 try:
     __version__ = version("hivekit")
@@ -41,8 +50,8 @@ def init(args) -> None:
     print(f"{BLUE}{ascii_art}{RESET}")
 
     # Default config path
-    config_dir = os.path.expandvars("$HOME/.hive")
-    config_path = os.path.join(config_dir, "config.yaml")
+    config_dir = get_config_dir()
+    config_path = get_config_path()
 
     # Check if config already exists
     if os.path.exists(config_path):
@@ -59,11 +68,21 @@ def init(args) -> None:
     # Create config directory if it doesn't exist
     os.makedirs(config_dir, exist_ok=True)
 
+    # Prompt for organization ID
+    organization_id = input("Enter your organization ID: ").strip()
+    if not organization_id:
+        console.print("[bold red]Error:[/bold red] Organization ID is required.")
+        return
+
     # Default configuration template
-    default_config = """# Hive Configuration File
+    # Use yaml.safe_dump to properly quote the organization_id to prevent YAML injection
+    safe_organization_id = yaml.safe_dump(organization_id, default_style="'").strip()
+    default_config = f"""# Hive Configuration File
 # This file contains the configuration for your Hive experiments.
 
 # Uncomment and configure the following fields as needed:
+
+organization_id: {safe_organization_id}
 
 log_level: INFO
 
@@ -116,6 +135,52 @@ provider:
     console.print("\nEdit the configuration with:", style="dim")
     console.print("  hive edit config", style="bold cyan")
 
+    # Log in if no existing credentials for this organization
+    credential_store = create_credential_store(
+        clients_dir=os.path.join(get_config_dir(), "clients"),
+        machine_id_func=get_machine_id,
+    )
+    existing_token = credential_store.load_token(organization_id=organization_id)
+    if existing_token is None:
+        logger.info(f"No existing credentials for organization '{organization_id}'. "
+                    f"Initiating login.")
+        console.print()
+        insecure = getattr(args, "insecure", False)
+        _run_login(console=console, organization_id=organization_id, insecure=insecure)
+
+
+def login(args) -> None:
+    """Log in to the Hive platform via OIDC."""
+    console = Console()
+
+    try:
+        organization_id = _load_organization_id()
+        insecure = getattr(args, "insecure", False)
+        _run_login(console=console, organization_id=organization_id, insecure=insecure)
+    except Exception as e:
+        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
+
+
+def logout(args) -> None:
+    """
+    Log out by clearing stored credentials for the currently configured organization.
+    """
+    console = Console()
+
+    try:
+        organization_id = _load_organization_id()
+        credential_store = create_credential_store(
+            clients_dir=os.path.join(get_config_dir(), "clients"),
+            machine_id_func=get_machine_id,
+        )
+        credential_store.delete_token(organization_id=organization_id)
+        console.print(
+            f"[bold green]✓ Cleared credentials for organization "
+            f"'{organization_id}'.[/bold green]"
+        )
+    except Exception as e:
+        console.print(f"[bold red]✗ Logout failed:[/bold red] {e}")
+
 
 def edit_cli(args):
     editor = os.environ.get("EDITOR", "vim")
@@ -154,23 +219,14 @@ def create_experiment(args) -> None:
         console.print(f"[bold red]Error building experiment CRD:[/bold red] {e}")
         return
 
-    # Initialize HTTP client
-    client = HttpClient()
-
-    # Check if token is available
-    if not client.auth_token:
-        console.print("[bold red]Error:[/bold red] Authentication token not found")
-        console.print(f"Please ensure token file exists at: {client.token_path}")
-        return
-
     # Send request to create experiment
     console.print("\n[yellow]Sending request to backend server...[/yellow]")
     try:
+        client = _get_http_client(args)
         result = client.create_experiment(experiment_crd)
         console.print("\n[bold green]✓ Experiment created successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
 
-        # Display additional info if available
         if result.get("metadata"):
             metadata = result["metadata"]
             if metadata.get("namespace"):
@@ -183,7 +239,6 @@ def create_experiment(args) -> None:
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
         console.print("  • Check that the backend server is running")
-        console.print(f"  • Verify your authentication token at {client.token_path}")
         return
 
 
@@ -194,15 +249,6 @@ def delete_experiment(args) -> None:
     experiment_name = args.name
 
     console.print(f"\n[bold yellow]Deleting experiment:[/bold yellow] {experiment_name}")
-
-    # Initialize HTTP client
-    client = HttpClient()
-
-    # Check if token is available
-    if not client.auth_token:
-        console.print("[bold red]Error:[/bold red] Authentication token not found")
-        console.print(f"Please ensure token file exists at: {client.token_path}")
-        return
 
     # Confirm deletion unless -y flag is set
     if not args.yes:
@@ -218,6 +264,7 @@ def delete_experiment(args) -> None:
     # Send request to delete experiment
     console.print("\n[yellow]Sending delete request to backend server...[/yellow]")
     try:
+        client = _get_http_client(args)
         _ = client.delete_experiment(experiment_name)
         console.print("\n[bold green]✓ Experiment deleted successfully![/bold green]")
         console.print(f"[dim]Name:[/dim] {experiment_name}")
@@ -227,7 +274,6 @@ def delete_experiment(args) -> None:
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
         console.print("  • Check that the backend server is running")
-        console.print(f"  • Verify your authentication token at {client.token_path}")
         console.print(f"  • Verify the experiment '{experiment_name}' exists")
         return
 
@@ -238,17 +284,8 @@ def list_experiments(args) -> None:
 
     console.print("\n[bold cyan]Listing experiments...[/bold cyan]")
 
-    # Initialize HTTP client
-    client = HttpClient()
-
-    # Check if token is available
-    if not client.auth_token:
-        console.print("[bold red]Error:[/bold red] Authentication token not found")
-        console.print(f"Please ensure token file exists at: {client.token_path}")
-        return
-
-    # Send request to list experiments
     try:
+        client = _get_http_client(args)
         result = client.list_experiments()
         experiments = result.get("experiments", [])
 
@@ -284,7 +321,6 @@ def list_experiments(args) -> None:
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
         console.print("  • Check that the backend server is running")
-        console.print(f"  • Verify your authentication token at {client.token_path}")
         return
 
 
@@ -296,22 +332,13 @@ def get_experiment(args) -> None:
 
     console.print(f"\n[bold cyan]Getting experiment:[/bold cyan] {experiment_name}")
 
-    # Initialize HTTP client
-    client = HttpClient()
-
-    # Check if token is available
-    if not client.auth_token:
-        console.print("[bold red]Error:[/bold red] Authentication token not found")
-        console.print(f"Please ensure token file exists at: {client.token_path}")
-        return
-
-    # Send request to get experiment
     try:
-        experiment = client.get_experiment(experiment_name)
+        client = _get_http_client(args)
+        exp = client.get_experiment(experiment_name)
 
-        metadata = experiment.get("metadata", {})
-        spec = experiment.get("spec", {})
-        status = experiment.get("status", {})
+        metadata = exp.get("metadata", {})
+        spec = exp.get("spec", {})
+        status = exp.get("status", {})
 
         # Display metadata
         console.print("\n[bold magenta]Metadata:[/bold magenta]")
@@ -357,18 +384,92 @@ def get_experiment(args) -> None:
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
         console.print("  • Check that the backend server is running")
-        console.print(f"  • Verify your authentication token at {client.token_path}")
         console.print(f"  • Verify the experiment '{experiment_name}' exists")
         return
 
 
+def _get_http_client(args: argparse.Namespace) -> HttpClient:
+    """
+    Build an HttpClient from the parsed command-line arguments.
+
+    Reads the organization ID from the config file when authentication is
+    enabled.
+    """
+    return create_http_client(
+        organization_id=_load_organization_id(),
+        no_auth=getattr(args, "no_auth", False),
+        insecure=getattr(args, "insecure", False),
+    )
+
+
+def _load_organization_id() -> str:
+    """
+    Load the organization ID from the config file.
+
+    Raises:
+        FileNotFoundError: If the config file does not exist.
+        ValueError: If the config file does not contain an organization ID.
+    """
+    config_path = get_config_path()
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            "No configuration found. Please run 'hive init' first."
+        )
+
+    config = load_config(file_path=config_path)
+
+    if not config.organization_id:
+        raise ValueError(
+            "No organization_id found in config. Please run 'hive init' to set it."
+        )
+
+    return config.organization_id
+
+
+def _run_login(console: Console, organization_id: str, insecure: bool = False) -> None:
+    """
+    Run the OIDC login flow for the given organization.
+    """
+    session_manager = create_session_manager(
+        organization_id=organization_id,
+        base_url=get_api_endpoint(),
+        insecure=insecure,
+    )
+    console.print("[yellow]Opening browser for login...[/yellow]")
+    try:
+        session_manager.login()
+        console.print("[bold green]✓ Login successful![/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]✗ Login failed:[/bold red] {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Hive CLI")
+    parser.add_argument(
+        "--no_auth",
+        action="store_true",
+        default=False,
+        help="Disable authentication",
+    )
+    parser.add_argument(
+        "--insecure",
+        action="store_true",
+        default=False,
+        help="Disable SSL certificate verification",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # init command
     parser_init = subparsers.add_parser("init", help="Initialize the Hive configuration")
     parser_init.set_defaults(func=init)
+
+    # login command
+    parser_login = subparsers.add_parser("login", help="Log in to the Hive platform")
+    parser_login.set_defaults(func=login)
+
+    # logout command
+    parser_logout = subparsers.add_parser("logout", help="Log out and clear stored credentials")
+    parser_logout.set_defaults(func=logout)
 
     # edit command
     parser_edit = subparsers.add_parser("edit", help="Edit Hive configuration")
