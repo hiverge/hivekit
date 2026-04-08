@@ -121,8 +121,8 @@ class TestBuildExperimentCRD:
             "nvidia.com/gpu": "1"
         }
 
-    def test_build_crd_with_sandbox_image(self):
-        """Test building CRD with sandbox image configuration."""
+    def test_build_crd_with_sandbox_base_image(self):
+        """Test building CRD with sandbox base image configuration."""
         config = HiveConfig(
             runtime=RuntimeConfig(),
             repo=RepoConfig(
@@ -137,7 +137,24 @@ class TestBuildExperimentCRD:
 
         result = build_experiment_crd(config, "test-exp")
 
-        assert result["spec"]["sandbox"]["image"] == "custom-image:latest"
+        assert result["spec"]["sandbox"]["baseImage"] == "custom-image:latest"
+
+    def test_build_crd_with_sandbox_workdir(self):
+        """Test building CRD with sandbox working directory configuration."""
+        config = HiveConfig(
+            runtime=RuntimeConfig(),
+            repo=RepoConfig(
+                source="https://github.com/test/repo.git",
+                evolve_files_and_ranges="main.py",
+            ),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest",
+                workdir="/app",
+            ),
+            provider=ProviderConfig(gcp=GCPConfig()),
+        )
+        result = build_experiment_crd(config, "test-exp")
+        assert result["spec"]["sandbox"]["workdir"] == "/app"
 
     def test_build_crd_with_sandbox_envs(self):
         """Test building CRD with sandbox environment variables."""
@@ -162,6 +179,27 @@ class TestBuildExperimentCRD:
         assert len(result["spec"]["sandbox"]["envs"]) == 2
         assert result["spec"]["sandbox"]["envs"][0] == {"name": "VAR1", "value": "value1"}
         assert result["spec"]["sandbox"]["envs"][1] == {"name": "VAR2", "value": "value2"}
+
+    def test_build_crd_with_sandbox_secrets(self):
+        """Test building CRD with sandbox secrets."""
+        config = HiveConfig(
+            runtime=RuntimeConfig(),
+            repo=RepoConfig(
+                source="https://github.com/test/repo.git",
+                evolve_files_and_ranges="main.py",
+            ),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest",
+                secrets=[KeyValueSet(name="SECRET_KEY", value="secret_value")],
+            ),
+            provider=ProviderConfig(gcp=GCPConfig()),
+        )
+        result = build_experiment_crd(config, "test-exp")
+        assert len(result["spec"]["sandbox"]["secrets"]) == 1
+        assert result["spec"]["sandbox"]["secrets"][0] == {
+            "name": "SECRET_KEY",
+            "value": "secret_value",
+        }
 
     def test_build_crd_with_setup_script(self):
         """Test building CRD with setup script."""
@@ -190,6 +228,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 services=[
                     ServiceConfig(
                         name="redis",
@@ -200,7 +239,7 @@ class TestBuildExperimentCRD:
                         args=["--appendonly", "yes"],
                         resources=ResourceConfig(cpu="500m", memory="1Gi"),
                     )
-                ]
+                ],
             ),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
@@ -226,7 +265,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             prompt=PromptConfig(
                 context="Test context",
                 ideas=["idea1", "idea2"],
@@ -249,7 +288,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             provider=ProviderConfig(gcp=GCPConfig()),
             coordinator_config_name="custom-coordinator",
         )
