@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from cli.config import (
-    EnvConfig,
+    KeyValueSet,
     GCPConfig,
     HiveConfig,
     PortConfig,
@@ -148,8 +148,8 @@ class TestBuildExperimentCRD:
             ),
             sandbox=SandboxConfig(
                 envs=[
-                    EnvConfig(name="VAR1", value="value1"),
-                    EnvConfig(name="VAR2", value="value2"),
+                    KeyValueSet(name="VAR1", value="value1"),
+                    KeyValueSet(name="VAR2", value="value2"),
                 ]
             ),
             provider=ProviderConfig(gcp=GCPConfig()),
@@ -191,7 +191,7 @@ class TestBuildExperimentCRD:
                         name="redis",
                         image="redis:latest",
                         ports=[PortConfig(port=6379, protocol="TCP")],
-                        envs=[EnvConfig(name="REDIS_PASSWORD", value="secret")],
+                        envs=[KeyValueSet(name="REDIS_PASSWORD", value="secret")],
                         command=["redis-server"],
                         args=["--appendonly", "yes"],
                         resources=ResourceConfig(cpu="500m", memory="1Gi"),
