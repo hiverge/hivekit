@@ -2,6 +2,7 @@
 Unit tests for experiment builder functions.
 """
 
+from email.mime import base
 from unittest.mock import patch
 
 import pytest
@@ -33,7 +34,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
 
@@ -59,7 +60,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
 
@@ -80,7 +81,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
                 include_files_and_ranges="utils.py:1-10",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
 
@@ -99,6 +100,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 resources=ResourceConfig(
                     cpu="2",
                     memory="4Gi",
@@ -129,7 +131,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
-                image="custom-image:latest",
+                base_image="custom-image:latest",
             ),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
@@ -147,6 +149,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 envs=[
                     KeyValueSet(name="VAR1", value="value1"),
                     KeyValueSet(name="VAR2", value="value2"),
@@ -161,21 +164,21 @@ class TestBuildExperimentCRD:
         assert result["spec"]["sandbox"]["envs"][0] == {"name": "VAR1", "value": "value1"}
         assert result["spec"]["sandbox"]["envs"][1] == {"name": "VAR2", "value": "value2"}
 
-    def test_build_crd_with_preprocessor(self):
-        """Test building CRD with preprocessor."""
+    def test_build_crd_with_setup_script(self):
+        """Test building CRD with setup script."""
         config = HiveConfig(
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(preprocessor="preprocess.py"),
+            sandbox=SandboxConfig(base_image="custom-image:latest", setup_script="pip install -r requirements.txt"),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
 
-        assert result["spec"]["sandbox"]["preprocessor"] == "preprocess.py"
+        assert result["spec"]["sandbox"]["setupScript"] == "pip install -r requirements.txt"
 
     def test_build_crd_with_services(self):
         """Test building CRD with additional services."""
@@ -262,7 +265,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             provider=ProviderConfig(
                 gcp=GCPConfig(enabled=True, spot=True),
             ),
