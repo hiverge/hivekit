@@ -35,6 +35,8 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
                 "evolveFilesAndRanges": config.repo.evolve_files_and_ranges,
             },
             "sandbox": {
+                "baseImage": config.sandbox.base_image,
+                "workdir": config.sandbox.workdir,
                 "timeout": config.sandbox.timeout,
                 "resources": {
                     "cpu": config.sandbox.resources.cpu,
@@ -49,8 +51,8 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
         experiment["spec"]["repo"]["includeFilesAndRanges"] = config.repo.include_files_and_ranges
 
     # Add optional sandbox fields
-    if config.sandbox.image:
-        experiment["spec"]["sandbox"]["image"] = config.sandbox.image
+    if config.sandbox.base_image:
+        experiment["spec"]["sandbox"]["baseImage"] = config.sandbox.base_image
 
     if config.sandbox.resources.accelerators:
         experiment["spec"]["sandbox"]["resources"]["accelerators"] = (
@@ -70,11 +72,13 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
             {"name": env.name, "value": env.value} for env in config.sandbox.envs
         ]
 
-    if config.sandbox.preprocessor:
-        experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.preprocessor
-    elif getattr(config.sandbox, "pre_processor", None):
-        # Handle deprecated field
-        experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.pre_processor
+    if config.sandbox.secrets:
+        experiment["spec"]["sandbox"]["secrets"] = [
+            {"name": secret.name, "value": secret.value} for secret in config.sandbox.secrets
+        ]
+
+    if config.sandbox.setup_script:
+        experiment["spec"]["sandbox"]["setupScript"] = config.sandbox.setup_script
 
     if config.sandbox.services:
         experiment["spec"]["sandbox"]["services"] = [
@@ -114,20 +118,6 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
     # Add coordinator config
     if config.coordinator_config_name:
         experiment["spec"]["coordinatorConfigName"] = config.coordinator_config_name
-
-    # Add provider configuration
-    if config.provider:
-        experiment["spec"]["provider"] = {}
-        if config.provider.gcp:
-            experiment["spec"]["provider"]["gcp"] = {
-                "enabled": config.provider.gcp.enabled,
-                "spot": config.provider.gcp.spot,
-            }
-        if config.provider.aws:
-            experiment["spec"]["provider"]["aws"] = {
-                "enabled": config.provider.aws.enabled,
-                "spot": config.provider.aws.spot,
-            }
 
     return experiment
 

@@ -24,7 +24,7 @@ class ResourceConfig(BaseModel):
     extended_resources: Optional[dict] = None
 
 
-class EnvConfig(BaseModel):
+class KeyValueSet(BaseModel):
     name: str
     value: str
 
@@ -43,7 +43,7 @@ class ServiceConfig(BaseModel):
     name: str
     image: str
     ports: Optional[list[PortConfig]] = None
-    envs: Optional[list[EnvConfig]] = None
+    envs: Optional[list[KeyValueSet]] = None
     command: Optional[list[str]] = None
     args: Optional[list[str]] = None
     resources: ResourceConfig = Field(
@@ -53,26 +53,33 @@ class ServiceConfig(BaseModel):
 
 
 class SandboxConfig(BaseModel):
-    image: Optional[str] = Field(
+    base_image: str = Field(
+        description="The base Docker image to use for the sandbox.",
+    )
+    workdir: str = Field(
+        default="/workspace",
+        description="The directory to the codebases. Default to /workspace.",
+    )
+    setup_script: Optional[str] = Field(
         default=None,
-        description="The Docker image to use for the sandbox. If set, it will skip the image building step.",
+        description="The setup script to run before the experiment starts. This can be used to install dependencies or do any other setup work. Default to None.",
+    )
+    envs: Optional[list[KeyValueSet]] = Field(
+        default=None,
+        description="Environment variables to set in the sandbox container.",
+    )
+    secrets: Optional[list[KeyValueSet]] = Field(
+        default=None,
+        description="Secrets to set in the sandbox container.",
+    )
+    services: Optional[list[ServiceConfig]] = Field(
+        default=None,
+        description="Additional services to run alongside the sandbox.",
     )
     timeout: int = 60
     resources: ResourceConfig = Field(
         default_factory=ResourceConfig,
         description="Resource configuration for the sandbox.",
-    )
-    envs: Optional[list[EnvConfig]] = Field(
-        default=None,
-        description="Environment variables to set in the sandbox container.",
-    )
-    preprocessor: Optional[str] = Field(
-        default=None,
-        description="A pre-processor script to run before the experiment. Use the `/data/preprocessor` directory to load/store datasets.",
-    )
-    services: Optional[list[ServiceConfig]] = Field(
-        default=None,
-        description="Additional services to run alongside the sandbox.",
     )
 
 
@@ -116,21 +123,6 @@ class RepoConfig(BaseModel):
         return v
 
 
-class GCPConfig(BaseModel):
-    enabled: bool = False
-    spot: bool = False
-
-
-class AWSConfig(BaseModel):
-    enabled: bool = False
-    spot: bool = False
-
-
-class ProviderConfig(BaseModel):
-    gcp: Optional[GCPConfig] = None
-    aws: Optional[AWSConfig] = None
-
-
 class RuntimeConfig(BaseModel):
     num_agents: int = Field(
         default=1,
@@ -157,8 +149,8 @@ class HiveConfig(BaseModel):
     #     description="The team ID to associate the experiment with. This is required for multi-tenant environments.",
     # )
     coordinator_config_name: str = Field(
-        default="default",
-        description="The name of the coordinator config to use for the experiment. Default to 'default'.",
+        default="default-coordinator-config",
+        description="The name of the coordinator config to use for the experiment. Default to 'default-coordinator-config'.",
     )
     runtime: RuntimeConfig = Field(
         default_factory=RuntimeConfig, description="Runtime configuration for the experiment."
@@ -172,10 +164,6 @@ class HiveConfig(BaseModel):
         description="Sandbox configuration for the experiment.",
     )
     prompt: Optional[PromptConfig] = None
-    # vendor configuration
-    provider: ProviderConfig = Field(
-        description="Provider configuration for the experiment.",
-    )
     log_level: str = Field(
         default="INFO",
         enumerated=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],

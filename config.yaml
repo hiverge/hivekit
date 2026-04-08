@@ -10,6 +10,12 @@ runtime:
   max_runtime_seconds: 7200
   max_iterations: 100
 sandbox:
+  base_image: python:3.9-slim
+  workdir: /workspace
+  setup_script: |
+    git clone https://github.com/hiverge/hivekit.git
+    pip install uv
+    uv sync --no-dev
   timeout: 1800
   resources:
     cpu: "500m"
@@ -19,13 +25,14 @@ sandbox:
   envs:
     - name: foo
       value: bar
+  secrets:
+    - name: secret1
+      value: value1
+    - name: secret2
+      value: value2
 prompt:
   enable_evolution: false
   context: foo
   ideas:
     - foo
     - bar
-provider:
-  gcp:
-    spot: true
-    enabled: true

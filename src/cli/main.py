@@ -99,15 +99,22 @@ runtime:
   max_iterations: -1  # -1 means no limit
 
 sandbox:
+  base_image: python:3.9-slim
   timeout: 60
   resources:
     cpu: "1"
     memory: "2Gi"
     # shmsize: "1Gi"
     # accelerators: a100-80gb:8
+  setup_script: |
+    pip install -r requirements.txt
   # envs:
   #   - name: EXAMPLE_VAR
   #     value: example_value
+  # secrets:
+  #   - name: SECRET_KEY
+  #     value: secret_value
+
 
 # prompt:
 #   context: "Additional context for your experiment"
@@ -115,14 +122,6 @@ sandbox:
 #     - "Idea 1"
 #     - "Idea 2"
 #   enable_evolution: false
-
-provider:
-  gcp:
-    enabled: false
-    spot: false
-  # aws:
-  #   enabled: false
-  #   spot: false
 """
 
     # Write the default configuration

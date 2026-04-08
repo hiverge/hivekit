@@ -7,12 +7,10 @@ from unittest.mock import patch
 import pytest
 
 from cli.config import (
-    EnvConfig,
-    GCPConfig,
     HiveConfig,
+    KeyValueSet,
     PortConfig,
     PromptConfig,
-    ProviderConfig,
     RepoConfig,
     ResourceConfig,
     RuntimeConfig,
@@ -33,8 +31,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
-            provider=ProviderConfig(gcp=GCPConfig()),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -59,8 +56,7 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
-            provider=ProviderConfig(gcp=GCPConfig()),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -80,8 +76,7 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
                 include_files_and_ranges="utils.py:1-10",
             ),
-            sandbox=SandboxConfig(),
-            provider=ProviderConfig(gcp=GCPConfig()),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -99,15 +94,15 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 resources=ResourceConfig(
                     cpu="2",
                     memory="4Gi",
                     accelerators="a100:2",
                     shmsize="2Gi",
                     extended_resources={"nvidia.com/gpu": "1"},
-                )
+                ),
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -120,8 +115,8 @@ class TestBuildExperimentCRD:
             "nvidia.com/gpu": "1"
         }
 
-    def test_build_crd_with_sandbox_image(self):
-        """Test building CRD with sandbox image configuration."""
+    def test_build_crd_with_sandbox_base_image(self):
+        """Test building CRD with sandbox base image configuration."""
         config = HiveConfig(
             runtime=RuntimeConfig(),
             repo=RepoConfig(
@@ -129,14 +124,29 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
-                image="custom-image:latest",
+                base_image="custom-image:latest",
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
 
-        assert result["spec"]["sandbox"]["image"] == "custom-image:latest"
+        assert result["spec"]["sandbox"]["baseImage"] == "custom-image:latest"
+
+    def test_build_crd_with_sandbox_workdir(self):
+        """Test building CRD with sandbox working directory configuration."""
+        config = HiveConfig(
+            runtime=RuntimeConfig(),
+            repo=RepoConfig(
+                source="https://github.com/test/repo.git",
+                evolve_files_and_ranges="main.py",
+            ),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest",
+                workdir="/app",
+            ),
+        )
+        result = build_experiment_crd(config, "test-exp")
+        assert result["spec"]["sandbox"]["workdir"] == "/app"
 
     def test_build_crd_with_sandbox_envs(self):
         """Test building CRD with sandbox environment variables."""
@@ -147,12 +157,12 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 envs=[
-                    EnvConfig(name="VAR1", value="value1"),
-                    EnvConfig(name="VAR2", value="value2"),
-                ]
+                    KeyValueSet(name="VAR1", value="value1"),
+                    KeyValueSet(name="VAR2", value="value2"),
+                ],
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -161,21 +171,42 @@ class TestBuildExperimentCRD:
         assert result["spec"]["sandbox"]["envs"][0] == {"name": "VAR1", "value": "value1"}
         assert result["spec"]["sandbox"]["envs"][1] == {"name": "VAR2", "value": "value2"}
 
-    def test_build_crd_with_preprocessor(self):
-        """Test building CRD with preprocessor."""
+    def test_build_crd_with_sandbox_secrets(self):
+        """Test building CRD with sandbox secrets."""
         config = HiveConfig(
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(preprocessor="preprocess.py"),
-            provider=ProviderConfig(gcp=GCPConfig()),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest",
+                secrets=[KeyValueSet(name="SECRET_KEY", value="secret_value")],
+            ),
+        )
+        result = build_experiment_crd(config, "test-exp")
+        assert len(result["spec"]["sandbox"]["secrets"]) == 1
+        assert result["spec"]["sandbox"]["secrets"][0] == {
+            "name": "SECRET_KEY",
+            "value": "secret_value",
+        }
+
+    def test_build_crd_with_setup_script(self):
+        """Test building CRD with setup script."""
+        config = HiveConfig(
+            runtime=RuntimeConfig(),
+            repo=RepoConfig(
+                source="https://github.com/test/repo.git",
+                evolve_files_and_ranges="main.py",
+            ),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest", setup_script="pip install -r requirements.txt"
+            ),
         )
 
         result = build_experiment_crd(config, "test-exp")
 
-        assert result["spec"]["sandbox"]["preprocessor"] == "preprocess.py"
+        assert result["spec"]["sandbox"]["setupScript"] == "pip install -r requirements.txt"
 
     def test_build_crd_with_services(self):
         """Test building CRD with additional services."""
@@ -186,19 +217,19 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(
+                base_image="custom-image:latest",
                 services=[
                     ServiceConfig(
                         name="redis",
                         image="redis:latest",
                         ports=[PortConfig(port=6379, protocol="TCP")],
-                        envs=[EnvConfig(name="REDIS_PASSWORD", value="secret")],
+                        envs=[KeyValueSet(name="REDIS_PASSWORD", value="secret")],
                         command=["redis-server"],
                         args=["--appendonly", "yes"],
                         resources=ResourceConfig(cpu="500m", memory="1Gi"),
                     )
-                ]
+                ],
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -222,13 +253,12 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             prompt=PromptConfig(
                 context="Test context",
                 ideas=["idea1", "idea2"],
                 enable_evolution=True,
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -245,33 +275,13 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(),
-            provider=ProviderConfig(gcp=GCPConfig()),
+            sandbox=SandboxConfig(base_image="custom-image:latest"),
             coordinator_config_name="custom-coordinator",
         )
 
         result = build_experiment_crd(config, "test-exp")
 
         assert result["spec"]["coordinatorConfigName"] == "custom-coordinator"
-
-    def test_build_crd_with_provider_config(self):
-        """Test building CRD with provider configuration."""
-        config = HiveConfig(
-            runtime=RuntimeConfig(),
-            repo=RepoConfig(
-                source="https://github.com/test/repo.git",
-                evolve_files_and_ranges="main.py",
-            ),
-            sandbox=SandboxConfig(),
-            provider=ProviderConfig(
-                gcp=GCPConfig(enabled=True, spot=True),
-            ),
-        )
-
-        result = build_experiment_crd(config, "test-exp")
-
-        assert result["spec"]["provider"]["gcp"]["enabled"] is True
-        assert result["spec"]["provider"]["gcp"]["spot"] is True
 
 
 class TestGenerateExperimentName:
