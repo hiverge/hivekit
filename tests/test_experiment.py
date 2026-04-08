@@ -7,9 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from cli.config import (
-    KeyValueSet,
     GCPConfig,
     HiveConfig,
+    KeyValueSet,
     PortConfig,
     PromptConfig,
     ProviderConfig,
