@@ -154,14 +154,6 @@ class RuntimeConfig(BaseModel):
             -1 means no limit.",
     )
 
-
-class BuildConfig(BaseModel):
-    base_image: str = Field(
-        default=None,
-        description="The base Docker image to use for building the sandbox image. If not set, will be detected based on the repository.",
-    )
-
-
 class HiveConfig(BaseModel):
     # team_id: str = Field(
     #     description="The team ID to associate the experiment with. This is required for multi-tenant environments.",
