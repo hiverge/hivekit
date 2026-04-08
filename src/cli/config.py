@@ -123,21 +123,6 @@ class RepoConfig(BaseModel):
         return v
 
 
-class GCPConfig(BaseModel):
-    enabled: bool = False
-    spot: bool = False
-
-
-class AWSConfig(BaseModel):
-    enabled: bool = False
-    spot: bool = False
-
-
-class ProviderConfig(BaseModel):
-    gcp: Optional[GCPConfig] = None
-    aws: Optional[AWSConfig] = None
-
-
 class RuntimeConfig(BaseModel):
     num_agents: int = Field(
         default=1,
@@ -153,6 +138,7 @@ class RuntimeConfig(BaseModel):
         description="Maximum number of iterations for the experiment. \
             -1 means no limit.",
     )
+
 
 class HiveConfig(BaseModel):
     # team_id: str = Field(
@@ -174,10 +160,6 @@ class HiveConfig(BaseModel):
         description="Sandbox configuration for the experiment.",
     )
     prompt: Optional[PromptConfig] = None
-    # vendor configuration
-    provider: ProviderConfig = Field(
-        description="Provider configuration for the experiment.",
-    )
     log_level: str = Field(
         default="INFO",
         enumerated=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],

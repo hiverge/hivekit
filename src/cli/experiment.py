@@ -119,20 +119,6 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
     if config.coordinator_config_name:
         experiment["spec"]["coordinatorConfigName"] = config.coordinator_config_name
 
-    # Add provider configuration
-    if config.provider:
-        experiment["spec"]["provider"] = {}
-        if config.provider.gcp:
-            experiment["spec"]["provider"]["gcp"] = {
-                "enabled": config.provider.gcp.enabled,
-                "spot": config.provider.gcp.spot,
-            }
-        if config.provider.aws:
-            experiment["spec"]["provider"]["aws"] = {
-                "enabled": config.provider.aws.enabled,
-                "spot": config.provider.aws.spot,
-            }
-
     return experiment
 
 

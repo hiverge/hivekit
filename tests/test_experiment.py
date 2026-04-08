@@ -7,12 +7,10 @@ from unittest.mock import patch
 import pytest
 
 from cli.config import (
-    GCPConfig,
     HiveConfig,
     KeyValueSet,
     PortConfig,
     PromptConfig,
-    ProviderConfig,
     RepoConfig,
     ResourceConfig,
     RuntimeConfig,
@@ -34,7 +32,6 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(base_image="custom-image:latest"),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -60,7 +57,6 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(base_image="custom-image:latest"),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -81,7 +77,6 @@ class TestBuildExperimentCRD:
                 include_files_and_ranges="utils.py:1-10",
             ),
             sandbox=SandboxConfig(base_image="custom-image:latest"),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -108,7 +103,6 @@ class TestBuildExperimentCRD:
                     extended_resources={"nvidia.com/gpu": "1"},
                 ),
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -132,7 +126,6 @@ class TestBuildExperimentCRD:
             sandbox=SandboxConfig(
                 base_image="custom-image:latest",
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -151,7 +144,6 @@ class TestBuildExperimentCRD:
                 base_image="custom-image:latest",
                 workdir="/app",
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
         result = build_experiment_crd(config, "test-exp")
         assert result["spec"]["sandbox"]["workdir"] == "/app"
@@ -171,7 +163,6 @@ class TestBuildExperimentCRD:
                     KeyValueSet(name="VAR2", value="value2"),
                 ],
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -192,7 +183,6 @@ class TestBuildExperimentCRD:
                 base_image="custom-image:latest",
                 secrets=[KeyValueSet(name="SECRET_KEY", value="secret_value")],
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
         result = build_experiment_crd(config, "test-exp")
         assert len(result["spec"]["sandbox"]["secrets"]) == 1
@@ -212,7 +202,6 @@ class TestBuildExperimentCRD:
             sandbox=SandboxConfig(
                 base_image="custom-image:latest", setup_script="pip install -r requirements.txt"
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -241,7 +230,6 @@ class TestBuildExperimentCRD:
                     )
                 ],
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -271,7 +259,6 @@ class TestBuildExperimentCRD:
                 ideas=["idea1", "idea2"],
                 enable_evolution=True,
             ),
-            provider=ProviderConfig(gcp=GCPConfig()),
         )
 
         result = build_experiment_crd(config, "test-exp")
@@ -289,32 +276,12 @@ class TestBuildExperimentCRD:
                 evolve_files_and_ranges="main.py",
             ),
             sandbox=SandboxConfig(base_image="custom-image:latest"),
-            provider=ProviderConfig(gcp=GCPConfig()),
             coordinator_config_name="custom-coordinator",
         )
 
         result = build_experiment_crd(config, "test-exp")
 
         assert result["spec"]["coordinatorConfigName"] == "custom-coordinator"
-
-    def test_build_crd_with_provider_config(self):
-        """Test building CRD with provider configuration."""
-        config = HiveConfig(
-            runtime=RuntimeConfig(),
-            repo=RepoConfig(
-                source="https://github.com/test/repo.git",
-                evolve_files_and_ranges="main.py",
-            ),
-            sandbox=SandboxConfig(base_image="custom-image:latest"),
-            provider=ProviderConfig(
-                gcp=GCPConfig(enabled=True, spot=True),
-            ),
-        )
-
-        result = build_experiment_crd(config, "test-exp")
-
-        assert result["spec"]["provider"]["gcp"]["enabled"] is True
-        assert result["spec"]["provider"]["gcp"]["spot"] is True
 
 
 class TestGenerateExperimentName:
