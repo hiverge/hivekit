@@ -35,6 +35,8 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
                 "evolveFilesAndRanges": config.repo.evolve_files_and_ranges,
             },
             "sandbox": {
+                "baseImage": config.sandbox.base_image,
+                "workdir": config.sandbox.workdir,
                 "timeout": config.sandbox.timeout,
                 "resources": {
                     "cpu": config.sandbox.resources.cpu,
@@ -70,11 +72,13 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
             {"name": env.name, "value": env.value} for env in config.sandbox.envs
         ]
 
-    if config.sandbox.preprocessor:
-        experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.preprocessor
-    elif getattr(config.sandbox, "pre_processor", None):
-        # Handle deprecated field
-        experiment["spec"]["sandbox"]["preprocessor"] = config.sandbox.pre_processor
+    if config.sandbox.secrets:
+        experiment["spec"]["sandbox"]["secrets"] = [
+            {"name": secret.name, "value": secret.value} for secret in config.sandbox.secrets
+        ]
+
+    if config.sandbox.setup_script:
+        experiment["spec"]["sandbox"]["setupScript"] = config.sandbox.setup_script
 
     if config.sandbox.services:
         experiment["spec"]["sandbox"]["services"] = [
