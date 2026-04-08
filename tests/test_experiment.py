@@ -2,7 +2,6 @@
 Unit tests for experiment builder functions.
 """
 
-from email.mime import base
 from unittest.mock import patch
 
 import pytest
@@ -107,7 +106,7 @@ class TestBuildExperimentCRD:
                     accelerators="a100:2",
                     shmsize="2Gi",
                     extended_resources={"nvidia.com/gpu": "1"},
-                )
+                ),
             ),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
@@ -153,7 +152,7 @@ class TestBuildExperimentCRD:
                 envs=[
                     KeyValueSet(name="VAR1", value="value1"),
                     KeyValueSet(name="VAR2", value="value2"),
-                ]
+                ],
             ),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
@@ -172,7 +171,9 @@ class TestBuildExperimentCRD:
                 source="https://github.com/test/repo.git",
                 evolve_files_and_ranges="main.py",
             ),
-            sandbox=SandboxConfig(base_image="custom-image:latest", setup_script="pip install -r requirements.txt"),
+            sandbox=SandboxConfig(
+                base_image="custom-image:latest", setup_script="pip install -r requirements.txt"
+            ),
             provider=ProviderConfig(gcp=GCPConfig()),
         )
 

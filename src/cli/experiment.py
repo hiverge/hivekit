@@ -51,8 +51,8 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
         experiment["spec"]["repo"]["includeFilesAndRanges"] = config.repo.include_files_and_ranges
 
     # Add optional sandbox fields
-    if config.sandbox.image:
-        experiment["spec"]["sandbox"]["image"] = config.sandbox.image
+    if config.sandbox.base_image:
+        experiment["spec"]["sandbox"]["baseImage"] = config.sandbox.base_image
 
     if config.sandbox.resources.accelerators:
         experiment["spec"]["sandbox"]["resources"]["accelerators"] = (
