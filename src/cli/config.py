@@ -1,4 +1,3 @@
-import secrets
 from typing import Optional
 
 import yaml
@@ -161,6 +160,7 @@ class BuildConfig(BaseModel):
         default=None,
         description="The base Docker image to use for building the sandbox image. If not set, will be detected based on the repository.",
     )
+
 
 class HiveConfig(BaseModel):
     # team_id: str = Field(
