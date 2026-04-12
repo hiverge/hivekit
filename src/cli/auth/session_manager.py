@@ -33,6 +33,7 @@ class OidcSessionManager:
         credential_store: CredentialStore,
         login_flow: OidcLoginFlow,
         token_endpoint: str,
+        insecure: bool = False,
     ) -> None:
         """
         Initialize the session manager.
@@ -42,11 +43,13 @@ class OidcSessionManager:
             credential_store: Where to load and persist tokens.
             login_flow: The OIDC login flow for interactive authentication.
             token_endpoint: The OIDC token endpoint URL.
+            insecure: If True, disable SSL certificate verification on all requests.
         """
         self._organization_id = organization_id
         self._credential_store = credential_store
         self._login_flow = login_flow
         self._token_endpoint = token_endpoint
+        self._insecure = insecure
 
     def create_session(self) -> OAuth2Session:
         """
@@ -83,12 +86,15 @@ class OidcSessionManager:
         Build an OAuth2Session with the given token, configured to persist
         refreshed tokens to the credential store.
         """
-        return OAuth2Session(
+        session = OAuth2Session(
             client_id=_OIDC_CLIENT_ID,
             token=token,
             token_endpoint=self._token_endpoint,
             update_token=self._on_token_update,
         )
+        if self._insecure:
+            session.verify = False
+        return session
 
     def _on_token_update(self, new_token: Dict[str, Any], **kwargs: object) -> None:
         """
@@ -138,4 +144,5 @@ def create_session_manager(
         credential_store=credential_store,
         login_flow=login_flow,
         token_endpoint=endpoints["token_endpoint"],
+        insecure=insecure,
     )

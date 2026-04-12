@@ -44,6 +44,7 @@ def _session_manager(
         credential_store=mock_credential_store,
         login_flow=mock_login_flow,
         token_endpoint="https://identity.example.com/realms/test-org/protocol/openid-connect/token",
+        insecure=False,
     )
 
 
@@ -179,3 +180,31 @@ class TestOidcSessionManager:
         assert manager._organization_id == "my-org"
         assert manager._credential_store is mock_store
         assert manager._login_flow is mock_flow
+
+    def test_insecure_flag_disables_ssl_verification_on_session(
+        self,
+        mock_credential_store: MagicMock,
+        mock_login_flow: MagicMock,
+    ) -> None:
+        """
+        Test that insecure=True disables SSL verification on OAuth2 sessions
+        created from stored tokens.
+        """
+        # given
+        session_manager = OidcSessionManager(
+            organization_id="test-org",
+            credential_store=mock_credential_store,
+            login_flow=mock_login_flow,
+            token_endpoint="https://identity.example.com/realms/test-org/protocol/openid-connect/token",
+            insecure=True,
+        )
+        mock_credential_store.load_token.return_value = {
+            "access_token": "stored-token",
+            "token_type": "Bearer",
+        }
+
+        # when
+        session = session_manager.create_session()
+
+        # then
+        assert session.verify is False
