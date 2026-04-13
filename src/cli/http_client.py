@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import Any, Callable, Dict, Optional
 
 import requests
+from authlib.integrations.base_client import OAuthError
 from rich.console import Console
 
 from cli.auth.session_manager import create_session_manager
@@ -153,11 +154,16 @@ class HttpClient:
         Make an HTTP request, automatically retrying once on 401 by invoking
         the on_auth_failure callback.
         """
-        response = self._session.request(
-            method=method, url=url, headers=headers, json=json, timeout=30,
-            verify=not self._insecure,
-        )
+        try:
+            response = self._session.request(
+                method=method, url=url, headers=headers, json=json, timeout=30,
+                verify=not self._insecure,
+            )
+        except OAuthError as e:
+            logger.info(f"OAuth error during request: {e.error}. Attempting to re-authenticate.")
+            return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
         if response.status_code == HTTPStatus.UNAUTHORIZED:
+            logger.info("Received 401 response. Attempting to re-authenticate.")
             return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
         return response
 
@@ -171,7 +177,6 @@ class HttpClient:
         """
         Attempt re-authentication and retry the failed request.
         """
-        logger.info("Received 401 response. Attempting to re-authenticate.")
         try:
             self._session = self._on_auth_failure()
         except AuthenticationError:
