@@ -8,6 +8,8 @@ import pytest
 import requests
 from pytest_mock import MockerFixture
 
+from authlib.integrations.base_client import OAuthError
+
 from cli.http_client import (
     AuthenticationError,
     HttpClient,
@@ -475,6 +477,59 @@ class TestAuthenticationHandling:
             timeout=30,
             verify=False,
         )
+
+    def test_oauth_error_triggers_reauth_and_retry(self) -> None:
+        """
+        Test that an OAuthError during token refresh triggers re-authentication
+        and retries the request.
+        """
+        # given
+        mock_session = MagicMock()
+        oauth_error = OAuthError(error="invalid_grant", description="Token is not active")
+        mock_session.request.side_effect = oauth_error
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.json.return_value = {"experiments": []}
+        new_session = MagicMock()
+        new_session.request.return_value = mock_200
+        mock_reauth = MagicMock(return_value=new_session)
+
+        client = HttpClient(
+            base_url="https://example.com/api/v1",
+            on_auth_failure=mock_reauth,
+            session=mock_session,
+        )
+
+        # when
+        result = client.list_experiments()
+
+        # then
+        assert result == {"experiments": []}
+        mock_reauth.assert_called_once()
+        new_session.request.assert_called_once()
+
+    def test_oauth_error_with_reauth_failure_raises_authentication_error(self) -> None:
+        """
+        Test that an OAuthError during token refresh followed by a failed
+        re-authentication raises AuthenticationError.
+        """
+        # given
+        mock_session = MagicMock()
+        oauth_error = OAuthError(error="invalid_grant", description="Token is not active")
+        mock_session.request.side_effect = oauth_error
+        mock_reauth = MagicMock(side_effect=Exception("Reauth failed"))
+
+        client = HttpClient(
+            base_url="https://example.com/api/v1",
+            on_auth_failure=mock_reauth,
+            session=mock_session,
+        )
+
+        # when / then
+        with pytest.raises(AuthenticationError, match="credentials have expired"):
+            client.list_experiments()
+        mock_reauth.assert_called_once()
 
 
 class TestCreateHttpClient:
