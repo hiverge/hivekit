@@ -141,8 +141,9 @@ sandbox:
     )
     existing_token = credential_store.load_token(organization_id=organization_id)
     if existing_token is None:
-        logger.info(f"No existing credentials for organization '{organization_id}'. "
-                    f"Initiating login.")
+        logger.info(
+            f"No existing credentials for organization '{organization_id}'. Initiating login."
+        )
         console.print()
         insecure = getattr(args, "insecure", False)
         _run_login(console=console, organization_id=organization_id, insecure=insecure)
@@ -174,8 +175,7 @@ def logout(args) -> None:
         )
         credential_store.delete_token(organization_id=organization_id)
         console.print(
-            f"[bold green]✓ Cleared credentials for organization "
-            f"'{organization_id}'.[/bold green]"
+            f"[bold green]✓ Cleared credentials for organization '{organization_id}'.[/bold green]"
         )
     except Exception as e:
         console.print(f"[bold red]✗ Logout failed:[/bold red] {e}")
@@ -411,16 +411,12 @@ def _load_organization_id() -> str:
     """
     config_path = get_config_path()
     if not os.path.exists(config_path):
-        raise FileNotFoundError(
-            "No configuration found. Please run 'hive init' first."
-        )
+        raise FileNotFoundError("No configuration found. Please run 'hive init' first.")
 
     config = load_config(file_path=config_path)
 
     if not config.organization_id:
-        raise ValueError(
-            "No organization_id found in config. Please run 'hive init' to set it."
-        )
+        raise ValueError("No organization_id found in config. Please run 'hive init' to set it.")
 
     return config.organization_id
 

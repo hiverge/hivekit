@@ -25,7 +25,10 @@ class TestLogout:
     """
 
     def test_clears_credentials_for_configured_organization(
-        self, mocker: MockerFixture, tmp_path: str, mock_args: MagicMock,
+        self,
+        mocker: MockerFixture,
+        tmp_path: str,
+        mock_args: MagicMock,
     ) -> None:
         """
         Test that logout deletes the token for the organization found in the config file.
@@ -62,7 +65,10 @@ class TestLogout:
         mock_store.delete_token.assert_called_once_with(organization_id="my-org")
 
     def test_prints_error_when_no_config_file(
-        self, mocker: MockerFixture, tmp_path: str, mock_args: MagicMock,
+        self,
+        mocker: MockerFixture,
+        tmp_path: str,
+        mock_args: MagicMock,
     ) -> None:
         """
         Test that logout prints an error when no config file exists.
@@ -77,7 +83,10 @@ class TestLogout:
         # then — no exception raised, error message printed to console
 
     def test_prints_error_when_no_organization_id_in_config(
-        self, mocker: MockerFixture, tmp_path: str, mock_args: MagicMock,
+        self,
+        mocker: MockerFixture,
+        tmp_path: str,
+        mock_args: MagicMock,
     ) -> None:
         """
         Test that logout prints an error when the config has no organization_id.
@@ -102,7 +111,10 @@ class TestLogout:
         mock_create_store.assert_not_called()
 
     def test_handles_delete_token_failure_gracefully(
-        self, mocker: MockerFixture, tmp_path: str, mock_args: MagicMock,
+        self,
+        mocker: MockerFixture,
+        tmp_path: str,
+        mock_args: MagicMock,
     ) -> None:
         """
         Test that logout handles delete_token exceptions gracefully.

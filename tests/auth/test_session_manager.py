@@ -54,8 +54,10 @@ class TestOidcSessionManager:
     """
 
     def test_create_session_returns_session_from_stored_token(
-        self, session_manager: OidcSessionManager,
-        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
+        self,
+        session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock,
+        mock_login_flow: MagicMock,
     ) -> None:
         """
         Test that create_session returns an OAuth2Session from a stored token
@@ -79,8 +81,10 @@ class TestOidcSessionManager:
         mock_login_flow.login.assert_not_called()
 
     def test_create_session_initiates_login_flow_when_no_stored_token(
-        self, session_manager: OidcSessionManager,
-        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
+        self,
+        session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock,
+        mock_login_flow: MagicMock,
     ) -> None:
         """
         Test that create_session initiates the login flow when no stored token
@@ -105,8 +109,10 @@ class TestOidcSessionManager:
         mock_login_flow.login.assert_called_once()
 
     def test_login_runs_flow_and_persists_token(
-        self, session_manager: OidcSessionManager,
-        mock_credential_store: MagicMock, mock_login_flow: MagicMock,
+        self,
+        session_manager: OidcSessionManager,
+        mock_credential_store: MagicMock,
+        mock_login_flow: MagicMock,
     ) -> None:
         """
         Test that login runs the OIDC login flow, persists the token, and
@@ -133,7 +139,8 @@ class TestOidcSessionManager:
         )
 
     def test_create_session_manager_wires_dependencies(
-        self, mocker: MockerFixture,
+        self,
+        mocker: MockerFixture,
     ) -> None:
         """
         Test that create_session_manager creates a manager with the correct

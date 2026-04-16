@@ -6,9 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
-from pytest_mock import MockerFixture
-
 from authlib.integrations.base_client import OAuthError
+from pytest_mock import MockerFixture
 
 from cli.http_client import (
     AuthenticationError,
@@ -51,7 +50,9 @@ class TestHttpClientInit:
     """
 
     def test_init_with_custom_base_url(
-        self, mock_on_auth_failure: MagicMock, mock_session: MagicMock,
+        self,
+        mock_on_auth_failure: MagicMock,
+        mock_session: MagicMock,
     ) -> None:
         """
         Test initialization with a custom base URL.
@@ -67,7 +68,9 @@ class TestHttpClientInit:
         assert client.base_url == "https://custom-server.com/api"
 
     def test_init_strips_trailing_slash(
-        self, mock_on_auth_failure: MagicMock, mock_session: MagicMock,
+        self,
+        mock_on_auth_failure: MagicMock,
+        mock_session: MagicMock,
     ) -> None:
         """
         Test that a trailing slash is removed from the base URL.
@@ -149,7 +152,9 @@ class TestHttpClientCreateExperiment:
     Tests for the `create_experiment` method.
     """
 
-    def test_create_experiment_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_create_experiment_success(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test successful experiment creation.
         """
@@ -173,7 +178,9 @@ class TestHttpClientCreateExperiment:
             verify=True,
         )
 
-    def test_create_experiment_http_error_with_json(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_create_experiment_http_error_with_json(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test that create_experiment handles an HTTP error with a JSON response.
         """
@@ -190,7 +197,9 @@ class TestHttpClientCreateExperiment:
         with pytest.raises(Exception, match="Failed to create experiment: Bad request"):
             http_client.create_experiment({"metadata": {"name": "test"}})
 
-    def test_create_experiment_http_error_with_text(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_create_experiment_http_error_with_text(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test that create_experiment handles an HTTP error with a text (non-JSON) response.
         """
@@ -208,7 +217,9 @@ class TestHttpClientCreateExperiment:
         with pytest.raises(Exception, match="Failed to create experiment: Server error"):
             http_client.create_experiment({"metadata": {"name": "test"}})
 
-    def test_create_experiment_connection_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_create_experiment_connection_error(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test that create_experiment handles connection errors.
         """
@@ -266,7 +277,9 @@ class TestHttpClientListExperiments:
     Tests for the `list_experiments` method.
     """
 
-    def test_list_experiments_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_list_experiments_success(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test successful list experiments.
         """
@@ -311,7 +324,9 @@ class TestHttpClientDeleteExperiment:
     Tests for the `delete_experiment` method.
     """
 
-    def test_delete_experiment_success(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_delete_experiment_success(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test successful delete experiment.
         """
@@ -335,7 +350,9 @@ class TestHttpClientDeleteExperiment:
             verify=True,
         )
 
-    def test_delete_experiment_error(self, http_client: HttpClient, mock_session: MagicMock) -> None:
+    def test_delete_experiment_error(
+        self, http_client: HttpClient, mock_session: MagicMock
+    ) -> None:
         """
         Test that delete_experiment handles errors.
         """
@@ -542,7 +559,9 @@ class TestCreateHttpClient:
         Test that create_http_client with no_auth=True returns an unauthenticated client.
         """
         # given
-        mock_get_endpoint = mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mock_get_endpoint = mocker.patch(
+            "cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1"
+        )
 
         # when
         client = create_http_client(no_auth=True)
@@ -553,15 +572,15 @@ class TestCreateHttpClient:
         with pytest.raises(AuthenticationError, match="Authentication is not configured"):
             client._on_auth_failure()
 
-    def test_no_organization_id_raises_authentication_error(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_no_organization_id_raises_authentication_error(self, mocker: MockerFixture) -> None:
         """
         Test that create_http_client raises AuthenticationError when no
         organization_id is provided.
         """
         # given
-        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mocker.patch(
+            "cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1"
+        )
 
         # when / then
         with pytest.raises(AuthenticationError, match="No organization ID configured"):
@@ -576,7 +595,9 @@ class TestCreateHttpClient:
         an authenticated client using the session manager.
         """
         # given
-        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mocker.patch(
+            "cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1"
+        )
         mock_create_sm = mocker.patch("cli.http_client.create_session_manager")
         mock_sm = MagicMock()
         mock_session = MagicMock()
@@ -600,7 +621,9 @@ class TestCreateHttpClient:
         Test that the insecure flag is passed through to the unauthenticated client.
         """
         # given
-        mocker.patch("cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1")
+        mocker.patch(
+            "cli.http_client.get_api_endpoint", return_value="https://platform.hiverge.ai/api/v1"
+        )
 
         # when
         client = create_http_client(no_auth=True, insecure=True)

@@ -118,7 +118,8 @@ class KeyringCredentialStore(CredentialStore):
         except Exception:
             logger.warning(
                 f"Failed to read stored token from keyring for organization '{organization_id}'. "
-                "The token may be corrupted or the machine ID may have changed.", exc_info=True
+                "The token may be corrupted or the machine ID may have changed.",
+                exc_info=True,
             )
             return None
 
@@ -173,7 +174,9 @@ class FileCredentialStore(CredentialStore):
         """
         path = self._token_path(organization_id=organization_id)
         if not os.path.exists(path):
-            logger.info(f"No stored token file found for organization '{organization_id}' at {path}.")
+            logger.info(
+                f"No stored token file found for organization '{organization_id}' at {path}."
+            )
             return None
         try:
             with open(path, "r") as f:
@@ -182,7 +185,8 @@ class FileCredentialStore(CredentialStore):
         except Exception:
             logger.warning(
                 f"Failed to read stored token for organization '{organization_id}' from {path}. "
-                "The token may be corrupted or the machine ID may have changed.", exc_info=True
+                "The token may be corrupted or the machine ID may have changed.",
+                exc_info=True,
             )
             return None
 

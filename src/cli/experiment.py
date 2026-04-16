@@ -119,6 +119,12 @@ def build_experiment_crd(config: HiveConfig, experiment_name: str) -> Dict[str, 
     if config.coordinator_config_name:
         experiment["spec"]["coordinatorConfigName"] = config.coordinator_config_name
 
+    # TODO: quick hack to support private github repo, will be replaced by github app in the future.
+    if config.repo.github_token:
+        experiment["metadata"]["annotations"] = {
+            "github.com/token": config.repo.github_token,
+        }
+
     return experiment
 
 
