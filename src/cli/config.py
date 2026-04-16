@@ -99,6 +99,10 @@ class PromptConfig(BaseModel):
 
 
 class RepoConfig(BaseModel):
+    github_token: Optional[str] = Field(
+        default=None,
+        description="GitHub token with access to the repository. This is required if the source is a private GitHub repository.",
+    )
     source: str
     branch: str = Field(
         default="main",
