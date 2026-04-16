@@ -152,9 +152,7 @@ class TestKeyringCredentialStore:
         assert result is None
         mock_keyring.get_password.assert_called_once_with("hivekit", "my-org")
 
-    def test_delete_token(
-        self, mock_keyring: MagicMock, encryptor: TokenEncryptor
-    ) -> None:
+    def test_delete_token(self, mock_keyring: MagicMock, encryptor: TokenEncryptor) -> None:
         """
         Test that deleting a token calls keyring.delete_password with the correct arguments.
         """
@@ -178,8 +176,8 @@ class TestKeyringCredentialStore:
         """
         # given
         stored_data = {}
-        mock_keyring.set_password.side_effect = (
-            lambda service, username, password: stored_data.update({(service, username): password})
+        mock_keyring.set_password.side_effect = lambda service, username, password: (
+            stored_data.update({(service, username): password})
         )
         mock_keyring.get_password.side_effect = lambda service, username: stored_data.get(
             (service, username)
@@ -247,9 +245,7 @@ class TestFileCredentialStore:
         result = store.load_token(organization_id="my-org")
         assert result is None
 
-    def test_delete_token_when_file_missing(
-        self, tmp_path: str, encryptor: TokenEncryptor
-    ) -> None:
+    def test_delete_token_when_file_missing(self, tmp_path: str, encryptor: TokenEncryptor) -> None:
         """
         Test that deleting a token when no file exists does not raise an error.
         """
@@ -342,9 +338,7 @@ class TestCreateCredentialStore:
         mock_backend.get_password.assert_called_once_with("hivekit", "_probe")
 
     @patch("cli.auth.credential_store.keyring")
-    def test_returns_file_store_when_keyring_unavailable(
-        self, mock_keyring: MagicMock
-    ) -> None:
+    def test_returns_file_store_when_keyring_unavailable(self, mock_keyring: MagicMock) -> None:
         """
         Test that the factory falls back to FileCredentialStore when keyring raises an exception.
         """

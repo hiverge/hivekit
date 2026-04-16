@@ -76,6 +76,7 @@ class CallbackServer:
         This ensures that the underlying HTTPServer both stops handling requests and
         closes its listening socket so the port can be reused promptly.
         """
+
         def _shutdown() -> None:
             try:
                 self._server.shutdown()
@@ -142,7 +143,9 @@ class OidcLoginFlow:
         finally:
             callback_server.shutdown()
 
-    def _perform_login(self, endpoints: Dict[str, str], callback_server: CallbackServer) -> Dict[str, Any]:
+    def _perform_login(
+        self, endpoints: Dict[str, str], callback_server: CallbackServer
+    ) -> Dict[str, Any]:
         """
         Perform the login steps: create session, open browser, and exchange code for tokens.
         """
@@ -155,9 +158,7 @@ class OidcLoginFlow:
         if self._insecure:
             session.verify = False
 
-        authorization_url, _ = session.create_authorization_url(
-            endpoints["authorization_endpoint"]
-        )
+        authorization_url, _ = session.create_authorization_url(endpoints["authorization_endpoint"])
 
         self._open_browser(url=authorization_url)
 
@@ -176,7 +177,5 @@ class OidcLoginFlow:
         try:
             self._browser_opener(url)
         except Exception:
-            self._console.print(
-                "[yellow]Please open the following URL in your browser:[/yellow]"
-            )
+            self._console.print("[yellow]Please open the following URL in your browser:[/yellow]")
             self._console.print(url)

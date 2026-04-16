@@ -156,7 +156,11 @@ class HttpClient:
         """
         try:
             response = self._session.request(
-                method=method, url=url, headers=headers, json=json, timeout=30,
+                method=method,
+                url=url,
+                headers=headers,
+                json=json,
+                timeout=30,
                 verify=not self._insecure,
             )
         except OAuthError as e:
@@ -186,7 +190,11 @@ class HttpClient:
                 "Your credentials have expired. Please run 'hive login' to re-authenticate."
             ) from e
         response = self._session.request(
-            method=method, url=url, headers=headers, json=json, timeout=30,
+            method=method,
+            url=url,
+            headers=headers,
+            json=json,
+            timeout=30,
             verify=not self._insecure,
         )
         if response.status_code == HTTPStatus.UNAUTHORIZED:
