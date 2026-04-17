@@ -134,21 +134,6 @@ sandbox:
     console.print("\nEdit the configuration with:", style="dim")
     console.print("  hive edit config", style="bold cyan")
 
-    # Log in if no existing credentials for this organization
-    credential_store = create_credential_store(
-        clients_dir=os.path.join(get_config_dir(), "clients"),
-        machine_id_func=get_machine_id,
-    )
-    existing_token = credential_store.load_token(organization_id=organization_id)
-    if existing_token is None:
-        logger.info(
-            f"No existing credentials for organization '{organization_id}'. Initiating login."
-        )
-        console.print()
-        insecure = getattr(args, "insecure", False)
-        _run_login(console=console, organization_id=organization_id, insecure=insecure)
-
-
 def login(args) -> None:
     """Log in to the Hive platform via OIDC."""
     console = Console()

@@ -57,8 +57,8 @@ class SandboxConfig(BaseModel):
         description="The base Docker image to use for the sandbox.",
     )
     workdir: str = Field(
-        default="/workspace",
-        description="The directory to the codebases. Default to /workspace.",
+        default="/app",
+        description="The directory to the codebases. Default to /app.",
     )
     setup_script: Optional[str] = Field(
         default=None,
@@ -72,14 +72,14 @@ class SandboxConfig(BaseModel):
         default=None,
         description="Secrets to set in the sandbox container.",
     )
-    services: Optional[list[ServiceConfig]] = Field(
-        default=None,
-        description="Additional services to run alongside the sandbox.",
-    )
     timeout: int = 60
     resources: ResourceConfig = Field(
         default_factory=ResourceConfig,
         description="Resource configuration for the sandbox.",
+    )
+    services: Optional[list[ServiceConfig]] = Field(
+        default=None,
+        description="Additional services to run alongside the sandbox.",
     )
 
 
@@ -147,7 +147,7 @@ class RuntimeConfig(BaseModel):
 class HiveConfig(BaseModel):
     organization_id: Optional[str] = Field(
         default=None,
-        description="The organization ID to associate the experiment with.",
+        description="The organization ID to associate the experiment with, will be removed in the future.",
     )
     # team_id: str = Field(
     #     description="The team ID to associate the experiment with. This is required for multi-tenant environments.",
