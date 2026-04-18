@@ -26,6 +26,7 @@ class TestBuildExperimentCRD:
     def test_build_minimal_crd(self):
         """Test building CRD with minimal required config."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -51,6 +52,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_runtime_config(self):
         """Test building CRD with custom runtime config."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(num_agents=5, max_runtime_seconds=3600, max_iterations=100),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -68,6 +70,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_optional_repo_fields(self):
         """Test building CRD with optional repo fields."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -88,6 +91,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_sandbox_resources(self):
         """Test building CRD with custom sandbox resources."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -118,6 +122,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_sandbox_base_image(self):
         """Test building CRD with sandbox base image configuration."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -135,6 +140,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_sandbox_workdir(self):
         """Test building CRD with sandbox working directory configuration."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -151,6 +157,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_sandbox_envs(self):
         """Test building CRD with sandbox environment variables."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -174,6 +181,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_sandbox_secrets(self):
         """Test building CRD with sandbox secrets."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -194,6 +202,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_setup_script(self):
         """Test building CRD with setup script."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -211,6 +220,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_services(self):
         """Test building CRD with additional services."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -248,6 +258,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_prompt_config(self):
         """Test building CRD with prompt configuration."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
@@ -270,6 +281,7 @@ class TestBuildExperimentCRD:
     def test_build_crd_with_coordinator_config(self):
         """Test building CRD with coordinator config."""
         config = HiveConfig(
+            organization_id="test-org",
             runtime=RuntimeConfig(),
             repo=RepoConfig(
                 source="https://github.com/test/repo.git",
