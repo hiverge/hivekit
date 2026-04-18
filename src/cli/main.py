@@ -130,6 +130,7 @@ sandbox:
     console.print("\nEdit the configuration with:", style="dim")
     console.print("  hive edit config", style="bold cyan")
 
+
 def login(args) -> None:
     """Log in to the Hive platform via OIDC."""
     console = Console()
