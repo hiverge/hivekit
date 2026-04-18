@@ -146,7 +146,7 @@ class RuntimeConfig(BaseModel):
 
 class HiveConfig(BaseModel):
     organization_id: Optional[str] = Field(
-        default=None,
+        required=True,
         description="The organization ID to associate the experiment with, will be removed in the future.",
     )
     # team_id: str = Field(
