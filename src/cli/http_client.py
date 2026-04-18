@@ -164,10 +164,10 @@ class HttpClient:
                 verify=not self._insecure,
             )
         except OAuthError as e:
-            logger.info(f"OAuth error during request: {e.error}. Attempting to re-authenticate.")
+            logger.debug(f"OAuth error during request: {e.error}. Attempting to re-authenticate.")
             return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
         if response.status_code == HTTPStatus.UNAUTHORIZED:
-            logger.info("Received 401 response. Attempting to re-authenticate.")
+            logger.debug("Received 401 response. Attempting to re-authenticate.")
             return self._retry_with_reauth(method=method, url=url, headers=headers, json=json)
         return response
 

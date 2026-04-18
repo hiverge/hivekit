@@ -111,10 +111,6 @@ sandbox:
   # envs:
   #   - name: EXAMPLE_VAR
   #     value: example_value
-  # secrets:
-  #   - name: SECRET_KEY
-  #     value: secret_value
-
 
 # prompt:
 #   context: "Additional context for your experiment"
@@ -133,6 +129,7 @@ sandbox:
     console.print(msg)
     console.print("\nEdit the configuration with:", style="dim")
     console.print("  hive edit config", style="bold cyan")
+
 
 def login(args) -> None:
     """Log in to the Hive platform via OIDC."""
@@ -203,8 +200,6 @@ def create_experiment(args) -> None:
         console.print(f"[bold red]Error building experiment CRD:[/bold red] {e}")
         return
 
-    # Send request to create experiment
-    console.print("\n[yellow]Sending request to backend server...[/yellow]")
     try:
         client = _get_http_client(args)
         result = client.create_experiment(experiment_crd)
@@ -222,7 +217,6 @@ def create_experiment(args) -> None:
         console.print(f"\n[bold red]✗ Failed to create experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
-        console.print("  • Check that the backend server is running")
         return
 
 
@@ -257,7 +251,6 @@ def delete_experiment(args) -> None:
         console.print(f"\n[bold red]✗ Failed to delete experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
-        console.print("  • Check that the backend server is running")
         console.print(f"  • Verify the experiment '{experiment_name}' exists")
         return
 
@@ -304,7 +297,6 @@ def list_experiments(args) -> None:
         console.print(f"\n[bold red]✗ Failed to list experiments:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
-        console.print("  • Check that the backend server is running")
         return
 
 
@@ -367,7 +359,6 @@ def get_experiment(args) -> None:
         console.print(f"\n[bold red]✗ Failed to get experiment:[/bold red] {e}")
         console.print("\n[yellow]Troubleshooting tips:[/yellow]")
         console.print("  • Ensure HIVE_API_ENDPOINT is set correctly")
-        console.print("  • Check that the backend server is running")
         console.print(f"  • Verify the experiment '{experiment_name}' exists")
         return
 
@@ -474,7 +465,7 @@ def main():
     )
     parser_create_exp.add_argument(
         "name",
-        help="Name of the experiment, if it ends with '-', a timestamp will be appended. Example: 'exp-' will become 'exp-2023-10-01-123456'",
+        help="Name of the experiment, if it ends with '-', a random suffix will be added for uniqueness",
     )
     parser_create_exp.add_argument(
         "-f",
