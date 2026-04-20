@@ -64,7 +64,7 @@ class OidcSessionManager:
             )
             return self.login()
         else:
-            logger.info(f"Loaded stored token for organization '{self._organization_id}'.")
+            logger.debug(f"Loaded stored token for organization '{self._organization_id}'.")
             return self._build_session(token=token)
 
     def login(self) -> OAuth2Session:
