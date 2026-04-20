@@ -191,7 +191,7 @@ def create_experiment(args) -> None:
         console.print(f"[bold red]Error generating experiment name:[/bold red] {e}")
         return
 
-    console.print(f"\n[bold cyan]Creating experiment:[/bold cyan] {experiment_name}")
+    console.print(f"[bold cyan]Creating experiment:[/bold cyan] {experiment_name}")
 
     # Build experiment CRD from config
     try:
@@ -202,16 +202,8 @@ def create_experiment(args) -> None:
 
     try:
         client = _get_http_client(args)
-        result = client.create_experiment(experiment_crd)
-        console.print("\n[bold green]✓ Experiment created successfully![/bold green]")
-        console.print(f"[dim]Name:[/dim] {experiment_name}")
-
-        if result.get("metadata"):
-            metadata = result["metadata"]
-            if metadata.get("namespace"):
-                console.print(f"[dim]Namespace:[/dim] {metadata['namespace']}")
-            if metadata.get("uid"):
-                console.print(f"[dim]UID:[/dim] {metadata['uid']}")
+        _ = client.create_experiment(experiment_crd)
+        console.print(f"[bold green]✓ Experiment '{experiment_name}' created successfully![/bold green]")
 
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to create experiment:[/bold red] {e}")
@@ -244,8 +236,7 @@ def delete_experiment(args) -> None:
     try:
         client = _get_http_client(args)
         _ = client.delete_experiment(experiment_name)
-        console.print("\n[bold green]✓ Experiment deleted successfully![/bold green]")
-        console.print(f"[dim]Name:[/dim] {experiment_name}")
+        console.print(f"[bold green]✓ Experiment '{experiment_name}' deleted successfully![/bold green]")
 
     except Exception as e:
         console.print(f"\n[bold red]✗ Failed to delete experiment:[/bold red] {e}")
@@ -259,15 +250,13 @@ def list_experiments(args) -> None:
     """List all experiments."""
     console = Console()
 
-    console.print("\n[bold cyan]Listing experiments...[/bold cyan]")
-
     try:
         client = _get_http_client(args)
         result = client.list_experiments()
         experiments = result.get("experiments", [])
 
         if not experiments:
-            console.print("\n[yellow]No experiments found.[/yellow]")
+            console.print("[yellow]No experiments found.[/yellow]")
             return
 
         # Create a table to display experiments
@@ -520,16 +509,6 @@ def main():
         "name", help="Name of the experiment"
     ).completer = experiment_completer
     parser_get_exp.set_defaults(func=get_experiment)
-
-    # show command (alias for list, for backward compatibility)
-    parser_show = subparsers.add_parser("show", help="Show resources (alias for list)")
-    show_subparsers = parser_show.add_subparsers(dest="show_target")
-
-    # show experiments
-    parser_show_exp = show_subparsers.add_parser(
-        "experiments", aliases=["exp", "exps"], help="Show all experiments"
-    )
-    parser_show_exp.set_defaults(func=list_experiments)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
